@@ -1,0 +1,1576 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0d0f0e">
+<title>OpenWrt N100 Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --font-mono: 'JetBrains Mono', 'Consolas', 'SF Mono', monospace;
+  --text-xxs:  clamp(0.56rem, 0.5rem  + 0.2vw, 0.63rem);
+  --text-xs:   clamp(0.63rem, 0.58rem + 0.2vw, 0.72rem);
+  --text-sm:   clamp(0.72rem, 0.65rem + 0.2vw, 0.82rem);
+  --text-base: clamp(0.8rem,  0.72rem + 0.2vw, 0.92rem);
+  --bg:        #0d0f0e;
+  --surface:   #111413;
+  --surface-2: #161918;
+  --surface-3: #1c1f1e;
+  --border:    #252b2a;
+  --border-2:  #2e3836;
+  --text:      #c6cfca;
+  --text-muted:#859e92;
+  --text-faint:#52635d;
+  --green:     #38b562; --green-dim: #193b25;
+  --yellow:    #cfa040; --yellow-dim:#6e4e10;
+  --red:       #de4f4f; --red-dim:   #5e1e1e;
+  --blue:      #4a94e8; --blue-dim:  #192f54;
+  --cyan:      #35c4b4; --cyan-dim:  #174d47;
+  --purple:    #9268d8;
+  --orange:    #d88838;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--font-mono);font-size:var(--text-base);line-height:1.4;-webkit-font-smoothing:antialiased;}
+
+/* ============================================================ TOPBAR */
+.topbar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 10px;height:24px;
+  background:var(--surface);border-bottom:1px solid var(--border);
+  font-size:var(--text-xs);color:var(--text-muted);flex-shrink:0;overflow:hidden;
+}
+.tb-l,.tb-r{display:flex;align-items:center;gap:8px;flex-wrap:nowrap;min-width:0;}
+.tb-title{color:var(--green);font-weight:700;letter-spacing:.06em;font-size:var(--text-sm);white-space:nowrap;}
+.tb-sep{color:var(--border-2);flex-shrink:0;}
+.tb-clock{color:var(--text);font-weight:600;}
+.tb-uptime{color:var(--cyan);}
+.tb-links{display:flex;gap:4px;margin-left:4px;flex-wrap:nowrap;}
+.tb-link{
+  color:var(--text-muted);text-decoration:none;font-size:var(--text-xxs);
+  padding:1px 5px;border:1px solid var(--border-2);border-radius:2px;
+  transition:color .15s,border-color .15s;white-space:nowrap;
+}
+.tb-link:hover{color:var(--cyan);border-color:var(--cyan-dim);}
+
+/* ============================================================ DASH WRAPPER */
+.dash{display:flex;flex-direction:column;height:100vh;width:100vw;overflow:hidden;}
+
+/* ============================================================
+   DESKTOP GRID  4col x 3row
+   Columns: 1fr  2fr  1fr  1fr
+   col1 col2(wide) col3 col4
+
+   Row 1: CPU | MEMORY | STORAGE | SERVICES(spans r1-r2)
+   Row 2: INTERFACES(spans r2-r3) | LATENCY | WAN | (services cont.)
+   Row 3: (iface cont.) | MIHOMO | ADGUARD | WIFI
+   + CLIENTS panel: sits between INTERFACES and MIHOMO row
+     Actually: col1 row2 = interfaces, col1 row3 = clients
+     But interfaces needs height — let's make it span r2 only and clients r3 col1
+
+   Final:
+   R1: cpu | memory | storage | services↕2
+   R2: interfaces↕2 | latency | wan | (svc)
+   R3: (iface) | mihomo | adguard | wifi
+   
+   Wait — interfaces spans 2 rows (r2-r3), so col1 r3 is taken by interfaces.
+   CLIENTS needs its own column-1 cell.
+
+   SOLUTION: Make the grid 4 rows for col1 and col2-4 uses 3 rows.
+   Use named grid areas for precision.
+   ============================================================ */
+.grid{
+  display:grid;
+  grid-template-columns: 1fr 2fr 1fr 1fr;
+  grid-template-rows: minmax(0,1.2fr) minmax(0,1fr) minmax(0,1fr);
+  grid-template-areas:
+    "cpu    memory  storage  services"
+    "ifaces latency wan      services"
+    "clients mihomo  adguard  wifi";
+  gap:1px;
+  background:var(--border);
+  flex:1;min-height:0;
+}
+
+/* Grid area assignments */
+.cell-cpu       {grid-area:cpu;}
+.cell-memory    {grid-area:memory;}
+.cell-storage   {grid-area:storage;}
+.cell-services  {grid-area:services;}
+.cell-interfaces{grid-area:ifaces;}
+.cell-latency   {grid-area:latency;}
+.cell-wan       {grid-area:wan;}
+.cell-clients   {grid-area:clients;}
+.cell-mihomo    {grid-area:mihomo;}
+.cell-adguard   {grid-area:adguard;}
+.cell-wifi      {grid-area:wifi;}
+
+/* ============================================================ PANEL */
+.panel{
+  background:var(--surface);padding:5px 8px;
+  overflow:hidden;display:flex;flex-direction:column;gap:2px;position:relative;
+}
+.ptitle{
+  font-size:var(--text-xs);font-weight:700;color:var(--text-muted);
+  letter-spacing:.1em;text-transform:uppercase;
+  border-bottom:1px solid var(--border-2);padding-bottom:2px;margin-bottom:2px;
+  display:flex;justify-content:space-between;align-items:center;flex-shrink:0;
+}
+.ptitle-r{display:flex;gap:5px;align-items:center;}
+.ptitle a.ext{color:var(--text-faint);text-decoration:none;font-size:11px;line-height:1;font-weight:400;letter-spacing:0;text-transform:none;}
+.ptitle a.ext:hover{color:var(--cyan);}
+.badge{font-size:var(--text-xs);padding:1px 4px;border-radius:1px;font-weight:500;}
+.b-ok{background:var(--green-dim);color:var(--green);}
+.b-warn{background:var(--yellow-dim);color:var(--yellow);}
+.b-err{background:var(--red-dim);color:var(--red);}
+.b-cyan{background:var(--cyan-dim);color:var(--cyan);}
+
+/* ============================================================ METRIC */
+.met{display:flex;align-items:baseline;justify-content:space-between;gap:8px;font-size:var(--text-sm);line-height:1.3;}
+.ml{color:var(--text-muted);white-space:nowrap;flex-shrink:0;}
+.mv{color:var(--text);font-weight:500;text-align:right;font-variant-numeric:tabular-nums;}
+.mv.ok{color:var(--green);}.mv.warn{color:var(--yellow);}.mv.err{color:var(--red);}
+.mv.blue{color:var(--blue);}.mv.cyan{color:var(--cyan);}.mv.muted{color:var(--text-muted);}
+
+/* ============================================================ BAR */
+.bw{margin:1px 0;}
+.blr{display:flex;justify-content:space-between;font-size:var(--text-xs);color:var(--text-muted);margin-bottom:1px;}
+.blr .bv{color:var(--text);font-variant-numeric:tabular-nums;}
+.bar{height:4px;background:var(--surface-3);border-radius:1px;overflow:hidden;position:relative;}
+.bar-max{position:absolute;top:0;bottom:0;width:2px;background:rgba(255,255,255,0.18);border-radius:1px;pointer-events:none;transition:left .5s ease;}
+.corebar-max{position:absolute;left:0;right:0;height:2px;background:rgba(255,255,255,0.18);border-radius:1px;pointer-events:none;transition:bottom .5s ease;}
+.core-maxval{font-size:var(--text-xxs);color:var(--text-faint);font-variant-numeric:tabular-nums;}
+.bf{height:100%;border-radius:1px;transition:width 0.8s cubic-bezier(0.4,0,0.2,1),background-color 0.5s ease;background:var(--green);}
+.bf.warn{background:var(--yellow);}.bf.err{background:var(--red);}
+.bf.blue{background:var(--blue);}.bf.cyan{background:var(--cyan);}.bf.purple{background:var(--purple);}
+
+/* ============================================================ CPU CORES */
+.cores{display:grid;grid-template-columns:repeat(4,1fr);gap:2px;margin-top:2px;}
+.core{font-size:var(--text-xs);text-align:center;}
+.corebar{height:26px;background:var(--surface-3);border-radius:1px;position:relative;overflow:hidden;margin-bottom:1px;}
+.corefill{position:absolute;bottom:0;left:0;right:0;transition:height .8s ease;border-radius:1px;}
+.corelbel{color:var(--text-muted);}
+.coreval{font-variant-numeric:tabular-nums;}
+
+/* ============================================================ SERVICE */
+.svc{display:flex;align-items:center;gap:6px;font-size:var(--text-sm);padding:1px 0;}
+.svc-action{
+  background:none;border:none;padding:0 2px;cursor:pointer;color:var(--text-faint);
+  font-size:11px;line-height:1;flex-shrink:0;border-radius:2px;
+  transition:color .15s,background .15s;
+}
+.svc-action:hover{color:var(--cyan);background:var(--cyan-dim);}
+.svc-action:active{color:var(--green);}
+.svc-action.spinning{animation:spin .6s linear infinite;pointer-events:none;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.log-line{
+  font-size:9px;color:var(--text-muted);font-family:var(--font-mono);
+  line-height:1.3;word-break:break-all;margin-bottom:1px;
+}
+.dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
+.dot.ok{background:var(--green);box-shadow:0 0 4px var(--green);}
+.dot.err{background:var(--red);box-shadow:0 0 4px var(--red);}
+.dot.warn{background:var(--yellow);box-shadow:0 0 4px var(--yellow);}
+.sname{color:var(--text);flex:1;}
+.sstatus{font-size:var(--text-xs);}
+.sstatus.ok{color:var(--green);}.sstatus.err{color:var(--red);}
+
+/* ============================================================ VPN GROUP */
+.vgrp{padding:2px 0;border-bottom:1px solid var(--border);}
+.vgrp:last-child{border-bottom:none;}
+.vgh{display:flex;align-items:center;justify-content:space-between;font-size:var(--text-sm);margin-bottom:1px;}
+.vgname{color:var(--cyan);font-weight:500;font-size:var(--text-xs);}
+.vgtype{font-size:var(--text-xs);color:var(--text-faint);}
+.vgactive{font-size:var(--text-xs);color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.vgstats{display:flex;gap:8px;font-size:var(--text-xs);color:var(--text-muted);margin-top:1px;}
+.vst-ok{color:var(--green);}.vst-err{color:var(--red);}
+
+/* ============================================================ IFACE */
+.iface{padding:2px 0;border-bottom:1px solid var(--border);}
+.iface:last-child{border-bottom:none;}
+.ifr1{display:flex;align-items:baseline;justify-content:space-between;font-size:var(--text-sm);}
+.ifname{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.ifname.up{color:var(--green);}.ifname.down{color:var(--text-muted);}
+.ifspd{font-size:var(--text-xs);color:var(--cyan);margin-left:auto;margin-right:6px;}
+.iflink{font-size:var(--text-xs);color:var(--text-muted);}
+.ifr2{display:flex;gap:6px;font-size:var(--text-xs);font-variant-numeric:tabular-nums;}
+.ifr2 .rx{color:var(--cyan);}.ifr2 .tx{color:var(--orange);}
+.ifr2 .er{color:var(--red);}
+.ifr2 span{color:var(--text-muted);}
+/* Dynamic traffic color helpers — applied via JS */
+.rx-dim{color:var(--text-faint)!important;}
+.rx-lo{color:#1e6e65!important;}
+.rx-mid{color:var(--cyan)!important;}
+.rx-hi{color:#50e8d6!important;text-shadow:0 0 8px rgba(53,196,180,.7);}
+.tx-dim{color:var(--text-faint)!important;}
+.tx-lo{color:#7a4a18!important;}
+.tx-mid{color:var(--orange)!important;}
+.tx-hi{color:#f0a855!important;text-shadow:0 0 8px rgba(216,136,56,.7);}
+
+/* ============================================================ PING */
+.pbar{flex:2;height:4px;background:var(--surface-3);border-radius:1px;overflow:hidden;}
+.pbf{height:100%;border-radius:1px;transition:width .8s ease;}
+.pval{font-variant-numeric:tabular-nums;width:42px;text-align:right;font-size:var(--text-xs);}
+.pval.ok{color:var(--green);}.pval.warn{color:var(--yellow);}.pval.err{color:var(--red);}.pval.cyan{color:var(--cyan);}
+
+/* ============================================================ DNS row */
+.ds{display:flex;align-items:baseline;justify-content:space-between;font-size:var(--text-xs);gap:6px;padding:1px 0;}
+.ds .dl{color:var(--text-muted);}.ds .dv{color:var(--text);font-variant-numeric:tabular-nums;}
+.ds .dv.ok{color:var(--green);}.ds .dv.warn{color:var(--yellow);}
+
+/* ============================================================ CLIENTS */
+.client-row{
+  display:flex;align-items:center;gap:4px;
+  padding:2px 0;border-bottom:1px solid var(--border);
+  font-size:var(--text-xs);
+}
+.client-row:last-child{border-bottom:none;}
+.cicon{width:13px;text-align:center;flex-shrink:0;font-style:normal;}
+.cicon.w5{color:var(--cyan);}
+.cicon.w24{color:var(--yellow);}
+.cicon.eth{color:var(--blue);}
+.cname{flex:1;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.cip{color:var(--text-muted);font-variant-numeric:tabular-nums;white-space:nowrap;margin-left:auto;padding-left:3px;}
+.cspd{color:var(--text-faint);font-size:var(--text-xxs);white-space:nowrap;padding-left:3px;}
+
+/* ============================================================ WIFI AP */
+.wifi-section{padding:2px 0;border-bottom:1px solid var(--border);}
+.wifi-section:last-child{border-bottom:none;}
+.wifi-sh{display:flex;align-items:center;justify-content:space-between;margin-bottom:2px;}
+.wifi-sname{color:var(--cyan);font-size:var(--text-xs);font-weight:500;}
+.wrow{display:flex;justify-content:space-between;gap:4px;font-size:var(--text-xs);}
+.wlabel{color:var(--text-muted);}
+.wval{color:var(--text);font-variant-numeric:tabular-nums;}
+.wlink{color:var(--text-faint);text-decoration:none;font-size:var(--text-xxs);}
+.wlink:hover{color:var(--cyan);}
+
+/* ============================================================ SHARED */
+hr{border:none;border-top:1px solid var(--border);margin:2px 0;}
+.si{flex:1;overflow-y:auto;overflow-x:hidden;scrollbar-width:none;min-height:0;}
+.si::-webkit-scrollbar{display:none;}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.live{display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--green);animation:blink 2s infinite;vertical-align:middle;margin-left:3px;}
+.footer{position:fixed;bottom:0;right:4px;font-size:var(--text-xxs);color:var(--text-faint);z-index:10;}
+.footer a{color:var(--text-faint);text-decoration:none;}
+
+/* ============================================================
+   TABLETS (iPad portrait, small laptops)  769px - 1024px
+   ============================================================ */
+@media (max-width: 1024px) and (min-width: 769px) {
+  .grid {
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto;
+    grid-auto-rows: minmax(200px, auto);
+    grid-template-areas:
+      "cpu      memory"
+      "storage  services"
+      "ifaces   latency"
+      "wan      clients"
+      "mihomo   adguard"
+      "wifi     wifi";
+  }
+  .panel { min-height: 200px; }
+}
+
+/* ============================================================
+   MOBILE  ≤ 768px  → 3 col x 4 row, full scroll
+   Row 1: cpu | memory | storage
+   Row 2: ifaces | latency | wan
+   Row 3: clients | mihomo | adguard
+   Row 4: services(span 2) | wifi
+   ============================================================ */
+@media (max-width:768px){
+  html,body{height:auto;overflow:auto;}
+  .dash{height:auto;overflow:visible;}
+  .topbar{
+    height:auto;flex-direction:column;align-items:flex-start;
+    padding:4px 8px;gap:3px;
+  }
+  .tb-l,.tb-r{flex-wrap:wrap;gap:5px;font-size:var(--text-xxs);}
+  .tb-r{margin-left:auto;justify-content:flex-end;}
+  .tb-links{margin-left:0;flex-wrap:wrap;}
+  .grid{
+    flex:none;height:auto;
+    grid-template-columns:1fr 1fr 1fr;
+    grid-template-rows:none;
+    grid-auto-rows:minmax(170px,auto);
+    grid-template-areas:
+      "cpu     memory   storage"
+      "ifaces  latency  wan"
+      "clients mihomo   adguard"
+      "services services wifi";
+    gap:1px;
+  }
+  .panel{min-height:170px;}
+  .si{max-height:220px;}
+  .footer{position:static;text-align:center;padding:4px;display:block;}
+}
+
+/* ============================================================
+   PHONE  ≤ 480px  → 2 col x 8 rows
+   ============================================================ */
+@media (max-width:480px){
+  .grid{
+    grid-template-columns:1fr 1fr;
+    grid-auto-rows:minmax(150px,auto);
+    grid-template-areas:
+      "cpu     memory"
+      "storage storage"
+      "ifaces  ifaces"
+      "latency wan"
+      "clients clients"
+      "mihomo  adguard"
+      "services services"
+      "wifi    wifi";
+  }
+  .panel{min-height:150px;}
+}
+/* ============================================================
+   ULTRAWIDE / 4K MONITORS
+   ============================================================ */
+@media (min-width: 1920px) {
+  body {
+    display: flex;
+    justify-content: center;
+    background: #000;
+  }
+  .dash {
+    max-width: 1600px;
+    width: 100%;
+    border-left: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+    box-shadow: 0 0 50px rgba(0,0,0,0.5);
+  }
+}
+</style>
+</head>
+<body>
+<div class="dash">
+
+  <!-- TOPBAR -->
+  <div class="topbar">
+    <div class="tb-l">
+      <span class="tb-title">OPENWRT N100</span>
+      <span class="tb-sep">|</span>
+      <span id="tb-host">topton-n100</span>
+      <span class="tb-sep">|</span>
+      <span id="tb-kernel" style="color:var(--text-muted)">kernel</span>
+      <span class="tb-sep">|</span>
+      <span id="tb-fw" style="color:var(--text-muted)">--</span>
+      <span class="tb-links">
+        <a class="tb-link" href="http://192.168.1.1:80"       target="_blank" rel="noopener">LuCI</a>
+        <a class="tb-link" href="http://192.168.1.1:9090/ui"  target="_blank" rel="noopener">Metacubexd</a>
+        <a class="tb-link" href="http://192.168.1.1:3030"     target="_blank" rel="noopener">AdGuard</a>
+        <span id="tb-wifiap-link"></span>
+      </span>
+    </div>
+    <div class="tb-r">
+      <span>uptime <span id="tb-up" class="tb-uptime">--:--:--</span></span>
+      <span class="tb-sep">|</span>
+      <span id="tb-temp" style="color:var(--green)">--</span>
+      <span class="tb-sep">|</span>
+      <span id="tb-wan-rx" style="color:var(--text-muted)">WAN</span>
+      <span class="tb-sep">|</span>
+      <span class="tb-clock" id="tb-clk">--:--:--</span>
+      <span id="tb-ntp" style="color:var(--text-faint)" title="last NTP sync"></span>
+      <span class="live"></span>
+    </div>
+  </div>
+
+  <!-- MAIN GRID -->
+  <div class="grid">
+
+    <!-- R1 C1 — CPU -->
+    <div class="panel cell-cpu">
+      <div class="ptitle">CPU <span class="badge b-ok" id="cpu-bdg">0%</span></div>
+      <div class="cores" id="cpu-cores"><!-- built dynamically by init_cores() --></div>
+      <hr>
+      <div class="met"><span class="ml">load 1m</span><span class="mv" id="ld1">--</span></div>
+      <div class="met"><span class="ml">load 5m</span><span class="mv" id="ld5">--</span></div>
+      <div class="met"><span class="ml">load 15m</span><span class="mv" id="ld15">--</span></div>
+      <hr>
+      <div class="met"><span class="ml">active conns</span><span class="mv blue" id="ct-act">--</span></div>
+      <div class="met"><span class="ml">ct max</span><span class="mv muted" id="ct-max">--</span></div>
+      <div class="bw"><div class="bar" style="height:5px"><div class="bf blue" id="ct-bar" style="width:0%"></div></div></div>
+      <div class="met"><span class="ml">nft tables</span><span class="mv muted" id="nft-d">--</span></div>
+    </div>
+
+    <!-- R1 C2 — MEMORY (visually wider on desktop due to col sizing in grid-template-areas — equal here, use CSS col span) -->
+    <div class="panel cell-memory">
+      <div class="ptitle">MEMORY</div>
+      <div class="bw"><div class="blr"><span>RAM used</span><span class="bv" id="ram-v">--</span></div><div class="bar"><div class="bf" id="ram-b" style="width:0%"></div><div class="bar-max" id="ram-max-bar" style="left:0"></div></div></div>
+      <div class="bw"><div class="blr"><span>buffers</span><span class="bv" id="buf-v">--</span></div><div class="bar"><div class="bf blue" id="buf-b" style="width:0%"></div><div class="bar-max" id="buf-max-bar" style="left:0"></div></div></div>
+      <div class="bw"><div class="blr"><span>cached</span><span class="bv" id="cch-v">--</span></div><div class="bar"><div class="bf cyan" id="cch-b" style="width:0%"></div><div class="bar-max" id="cch-max-bar" style="left:0"></div></div></div>
+      <hr>
+      <div class="bw"><div class="blr"><span>SWAP</span><span class="bv" id="swp-v">none</span></div><div class="bar"><div class="bf purple" id="swp-b" style="width:0%"></div><div class="bar-max" id="swp-max-bar" style="left:0"></div></div></div>
+      <hr>
+      <div class="met"><span class="ml">free</span><span class="mv ok" id="ram-free">--</span></div>
+      <div class="met"><span class="ml">available</span><span class="mv cyan" id="ram-avail">--</span></div>
+    </div>
+
+    <!-- R1 C3 — STORAGE -->
+    <div class="panel cell-storage">
+      <div class="ptitle">STORAGE <span id="nvme-temp" style="font-size:var(--text-xxs);color:var(--text-faint);font-weight:400;letter-spacing:0;text-transform:none"></span></div>
+      <div class="si" id="disk-p"><div class="met"><span class="ml" style="color:var(--text-faint)">scanning...</span></div></div>
+    </div>
+
+    <!-- R1-R2 C4 — SERVICES (spans 2 rows) -->
+    <div class="panel cell-services">
+      <div class="ptitle">SERVICES</div>
+      <div class="si" id="svc-p"></div>
+    </div>
+
+    <!-- R2-R3 C1 — INTERFACES (spans 2 rows on desktop) -->
+    <!-- On desktop: grid-area "ifaces" which occupies row2 only per template above -->
+    <!-- We want it to span r2 only; CLIENTS takes r3 c1 separately -->
+    <div class="panel cell-interfaces">
+      <div class="ptitle">INTERFACES <span style="font-size:var(--text-xs);color:var(--text-faint)" id="ct-bdg">ct: --</span></div>
+      <div class="si" id="net-p"></div>
+    </div>
+
+    <!-- R2 C2 — LATENCY -->
+    <div class="panel cell-latency">
+      <div class="ptitle">LATENCY</div>
+      <div class="si" id="ping-p"></div>
+    </div>
+
+    <!-- R2 C3 — WAN -->
+    <div class="panel cell-wan">
+      <div class="ptitle">WAN</div>
+      <div class="si" id="wan-p"></div>
+    </div>
+
+    <!-- R3 C1 — CLIENTS -->
+    <div class="panel cell-clients">
+      <div class="ptitle">
+        <span>CLIENTS <span class="badge b-ok" id="cl-bdg" style="background:var(--surface-3);color:var(--text-muted)">--</span></span>
+      </div>
+      <div class="si" id="clients-p">
+        <div class="met"><span class="ml" style="color:var(--text-faint)">reading leases...</span></div>
+      </div>
+    </div>
+
+    <!-- R3 C2 — MIHOMO -->
+    <div class="panel cell-mihomo">
+      <div class="ptitle">
+        <span>MIHOMO PROXY <span class="badge b-cyan" id="mi-mode">--</span></span>
+        <a class="ext" href="http://192.168.1.1:9090/ui" target="_blank" rel="noopener" title="Open Metacubexd">&#8599;</a>
+      </div>
+      <div class="si" id="vpn-p"></div>
+    </div>
+
+    <!-- R3 C3 — ADGUARD -->
+    <div class="panel cell-adguard">
+      <div class="ptitle">
+        <span>DNS / ADGUARD <span class="badge b-ok" id="agh-bdg">--</span></span>
+        <a class="ext" href="http://192.168.1.1:3030" target="_blank" rel="noopener" title="Open AdGuard">&#8599;</a>
+      </div>
+      <div class="si" id="dns-p"></div>
+    </div>
+
+    <!-- R3 C4 — WIFI AP -->
+    <div class="panel cell-wifi">
+      <div class="ptitle">
+        <span>WIFI AP</span>
+        <div class="ptitle-r">
+          <span class="badge" id="wifi-bdg" style="background:var(--surface-3);color:var(--text-muted)">--</span>
+          <a class="ext" id="wifi-admin-link" href="#" target="_blank" rel="noopener" title="WiFi AP admin" style="display:none">&#8599;</a>
+        </div>
+      </div>
+      <div class="si" id="wifi-p">
+        <div class="met"><span class="ml" style="color:var(--text-faint)">checking...</span></div>
+      </div>
+    </div>
+
+  </div><!-- /grid -->
+</div><!-- /dash -->
+
+<div class="footer"><a href="https://github.com/Anilexis/openwrt-darkboard" target="_blank" rel="noopener noreferrer">DarkBoard</a></div>
+
+<script>
+// ===== CONFIG =====
+// ============================================================
+//  C O N F I G  —  edit before deploy (or use install.sh)
+// ============================================================
+const C = {
+  router:        'http://192.168.1.1',   // router IP
+  luci_rpc:      'http://192.168.1.1/ubus',
+  luci_pass:     '',                     // root password (leave empty if no password)
+  mihomo_api:    'http://192.168.1.1:9090',
+  mihomo_secret: '',                     // mihomo/nikki external-controller secret
+  adguard_host:  '192.168.1.1',
+  adguard_port:  3030,
+  adguard_user:  'admin',
+  adguard_pass:  '',
+  wifi_ap:        '',                    // External WiFi AP IP (leave empty to use local wireless)
+  wifi_ap_port:   '',                    // AP admin port, e.g. 8443 for HTTPS or 80/443. Leave empty to hide link
+  wifi_ap_https:  true,                  // true = HTTPS, false = HTTP for AP admin
+  fast:   2000,
+  slow:   8000,
+  vpn:    5000,
+  ping: 300000,
+  clients: 10000,
+  wifi:   15000,
+};
+
+// ===== STATE =====
+let tok = null, pCPU = null, pNet = {};
+// Max-value history (in-session peak tracking)
+let maxCPU = [];                   // per-core max %, sized dynamically by init_cores()
+let maxRAM = 0, maxBuf = 0, maxCch = 0, maxSwp = 0;  // bar pct peaks
+let maxCT = 0;                    // conntrack peak %
+let maxLat = {};                  // key -> max ms
+let ifaceSpdMap = {};  // iface -> speed string, updated from update_net
+
+// ===== UTILS =====
+const $ = id => document.getElementById(id);
+const fmt_b = b => {
+  if(b==null||isNaN(b)||!isFinite(b)) return '--';
+  const a=Math.abs(b);
+  if(a>=1e9) return (b/1e9).toFixed(2)+'G/s';
+  if(a>=1e6) return (b/1e6).toFixed(1)+'M/s';
+  if(a>=1e3) return (b/1e3).toFixed(0)+'K/s';
+  return Math.round(b)+'B/s';
+};
+const fmt_mb = kb => (kb/1024).toFixed(0)+' MB';
+const bar_pct = (v,max) => Math.min(100,Math.max(0,v/max*100));
+const fmt_sz = b => {
+  if(!b||b<=0) return '0';
+  if(b>=1e9) return (b/1e9).toFixed(1)+'G';
+  if(b>=1e6) return (b/1e6).toFixed(0)+'M';
+  return (b/1e3).toFixed(0)+'K';
+};
+
+// ===== CLOCK =====
+const tick_clock = () => {
+  const n=new Date();
+  $('tb-clk').textContent=[n.getHours(),n.getMinutes(),n.getSeconds()].map(x=>String(x).padStart(2,'0')).join(':');
+};
+setInterval(tick_clock,1000); tick_clock();
+
+// ===== LUCI UBUS =====
+async function luci_call(obj,method,args){
+  const res=await fetch(C.luci_rpc,{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({jsonrpc:'2.0',id:1,method:'call',
+      params:[tok||'0'.repeat(32),obj,method,args||{}]}),
+    signal:AbortSignal.timeout(5000)
+  });
+  const j=await res.json(); return j.result;
+}
+async function luci_login(){
+  const res=await fetch(C.luci_rpc,{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({jsonrpc:'2.0',id:1,method:'call',
+      params:['0'.repeat(32),'session','login',{username:'root',password:C.luci_pass}]}),
+    signal:AbortSignal.timeout(4000)
+  });
+  const j=await res.json();
+  if(j.result?.[1]?.ubus_rpc_session) tok=j.result[1].ubus_rpc_session;
+}
+
+// ===== HELPERS =====
+async function file_read(path){
+  const r=await luci_call('file','read',{path});
+  return r?.[1]?.data?.trim()||'';
+}
+async function file_exec(command,params){
+  const r=await luci_call('file','exec',{command,params:params||[]});
+  return r?.[1]||{};
+}
+
+// ===== INIT CORES (dynamic) =====
+let numCores = 0;
+async function init_cores(){
+  // Try /proc/cpuinfo first
+  try{
+    const raw=await file_read('/proc/cpuinfo');
+    if(raw){
+      const n=(raw.match(/^processor\s*:/gm)||[]).length;
+      if(n>0){numCores=n;build_cores(n);return;}
+    }
+  }catch(e){}
+  // Fallback: nproc via system.info
+  try{
+    const r=await luci_call('system','info',{});
+    const n=r?.[1]?.cpus; if(n>0){numCores=n;build_cores(n);return;}
+  }catch(e){}
+  // Safe default: 4
+  numCores=4; build_cores(4);
+}
+function build_cores(n){
+  maxCPU=Array(n).fill(0);
+  const cols=n<=2?n:n<=4?n:n<=8?4:4; // max 4 columns
+  const grid=$('cpu-cores');
+  if(!grid) return;
+  grid.style.gridTemplateColumns=`repeat(${cols},1fr)`;
+  let html='';
+  for(let i=0;i<n;i++){
+    html+=`<div class="core"><div class="corebar"><div class="corefill" id="cc${i}"></div><div class="corebar-max" id="cm${i}" style="bottom:0"></div></div><div class="corelbel">C${i}</div><div class="coreval" id="cv${i}">--%</div><div class="core-maxval" id="cmv${i}">0%</div></div>`;
+  }
+  grid.innerHTML=html;
+}
+
+// ===== BOARD =====
+async function update_board(){
+  const r=await luci_call('system','board',{});
+  const b=r?.[1]; if(!b) return;
+  if(b.hostname) $('tb-host').textContent=b.hostname;
+  if(b.kernel)   $('tb-kernel').textContent='kernel '+b.kernel;
+  if(b.release?.version) $('tb-fw').textContent=b.release.version+' '+(b.release.revision||'');
+}
+
+// ===== CPU =====
+let cpuMethod='unknown';
+async function update_cpu(){
+  if(cpuMethod==='unknown'||cpuMethod==='realtime'){
+    try{
+      const r=await luci_call('luci','getRealtimeStats',{mode:'cpu'});
+      const data=r?.[1]?.result;
+      if(data&&Array.isArray(data)&&data.length>=2){
+        cpuMethod='realtime';
+        const prev=data[data.length-2],curr=data[data.length-1];
+        if(prev&&curr&&prev.length>=8&&curr.length>=8){
+          const du=curr[1]-prev[1],dn=curr[2]-prev[2],ds=curr[3]-prev[3];
+          const di=curr[4]-prev[4],dw=curr[5]-prev[5],dr=curr[6]-prev[6],dsi=curr[7]-prev[7];
+          const dt=du+dn+ds+di+dw+dr+dsi;
+          const p=dt>0?Math.round((1-di/dt)*100):0;
+          const b=$('cpu-bdg'); b.textContent=p+'%'; b.className='badge '+(p>80?'b-err':p>50?'b-warn':'b-ok');
+          for(let i=0;i<numCores;i++){
+            if(p>maxCPU[i]) maxCPU[i]=p;
+            const f=$('cc'+i),v=$('cv'+i),mx=$('cm'+i),mv=$('cmv'+i);
+            if(f){f.style.height=p+'%';f.style.background=p>80?'var(--red)':p>50?'var(--yellow)':'var(--green)';}
+            if(v){v.textContent=p+'%';v.style.color=p>80?'var(--red)':p>50?'var(--yellow)':'var(--green)';}
+            if(mx){mx.style.bottom=maxCPU[i]+'%';mx.title='max '+maxCPU[i]+'%';}
+            if(mv) mv.textContent=maxCPU[i]+'%';
+          }
+          return;
+        }
+      }
+    }catch(e){}
+  }
+  if(cpuMethod==='unknown'||cpuMethod==='procstat'){
+    try{
+      const raw=await file_read('/proc/stat');
+      if(raw&&raw.startsWith('cpu')){
+        cpuMethod='procstat';
+        const lines=raw.split('\n').filter(l=>l.startsWith('cpu'));
+        const parse=l=>{const p=l.trim().split(/\s+/).slice(1).map(Number);const[u,n,s,id,io,irq,si]=p;return{idle:id,total:u+n+s+id+(io||0)+(irq||0)+(si||0)};};
+        const curr=lines.map(parse);
+        if(!pCPU){pCPU=curr;return;}
+        const dt0=curr[0].total-pCPU[0].total,di0=curr[0].idle-pCPU[0].idle;
+        const p0=dt0>0?Math.round((1-di0/dt0)*100):0;
+        const b=$('cpu-bdg'); b.textContent=p0+'%'; b.className='badge '+(p0>80?'b-err':p0>50?'b-warn':'b-ok');
+        for(let i=0;i<numCores;i++){
+          const ci=curr[i+1],pi=pCPU[i+1]; if(!ci||!pi) continue;
+          const dt=ci.total-pi.total,di=ci.idle-pi.idle;
+          const p=dt>0?Math.round((1-di/dt)*100):0;
+          if(p>maxCPU[i]) maxCPU[i]=p;
+          const f=$('cc'+i),v=$('cv'+i),mx=$('cm'+i);
+          if(f){f.style.height=p+'%';f.style.background=p>80?'var(--red)':p>50?'var(--yellow)':'var(--green)';}
+          if(v){v.textContent=p+'%';v.style.color=p>80?'var(--red)':p>50?'var(--yellow)':'var(--green)';}
+          if(mx){mx.style.bottom=maxCPU[i]+'%';mx.title='max '+maxCPU[i]+'%';}
+          const mv=$('cmv'+i); if(mv) mv.textContent=maxCPU[i]+'%';
+        }
+        pCPU=curr; return;
+      }
+    }catch(e){}
+  }
+  cpuMethod='loadavg';
+  const r=await luci_call('system','info',{});
+  const info=r?.[1];
+  if(info?.load){
+    const ld1=info.load[0]/65536,pct=Math.min(100,Math.round(ld1/4*100));
+    const b=$('cpu-bdg'); b.textContent='~'+pct+'%'; b.className='badge '+(pct>80?'b-err':pct>50?'b-warn':'b-ok');
+    for(let i=0;i<numCores;i++){
+      if(pct>maxCPU[i]) maxCPU[i]=pct;
+      const f=$('cc'+i),v=$('cv'+i),mx=$('cm'+i),mv=$('cmv'+i);
+      if(f){f.style.height=pct+'%';f.style.background=pct>80?'var(--red)':pct>50?'var(--yellow)':'var(--green)';}
+      if(v){v.textContent='~'+pct+'%';v.style.color=pct>80?'var(--red)':pct>50?'var(--yellow)':'var(--green)';}
+      if(mx){mx.style.bottom=maxCPU[i]+'%';mx.title='max '+maxCPU[i]+'%';}
+      if(mv) mv.textContent=maxCPU[i]+'%';
+    }
+  }
+}
+
+// ===== SYSINFO =====
+async function update_sysinfo(){
+  const r=await luci_call('system','info',{});
+  const info=r?.[1]; if(!info) return;
+  if(info.uptime){
+    const u=info.uptime,d=Math.floor(u/86400),h=Math.floor((u%86400)/3600),m=Math.floor((u%3600)/60),s=u%60;
+    $('tb-up').textContent=(d?d+'d ':'')+[h,m,s].map(x=>String(x).padStart(2,'0')).join(':');
+  }
+  if(info.load){
+    const l=info.load;
+    $('ld1').textContent=(l[0]/65536).toFixed(2);
+    $('ld5').textContent=(l[1]/65536).toFixed(2);
+    $('ld15').textContent=(l[2]/65536).toFixed(2);
+  }
+  if(info.memory){
+    const m=info.memory;
+    const{total,free,buffered:buf,cached:cch,available:avail}=m;
+    const used=total-free,pct=Math.round(used/total*100);
+    $('ram-v').textContent=fmt_mb(used/1024)+' / '+fmt_mb(total/1024);
+    $('ram-free').textContent=fmt_mb(free/1024);
+    $('ram-avail').textContent=fmt_mb((avail||free)/1024);
+    const rp=Math.min(100,pct);
+    if(rp>maxRAM) maxRAM=rp;
+    const rb=$('ram-b'); rb.style.width=rp+'%'; rb.className='bf '+(pct>85?'err':pct>65?'warn':'');
+    const rmx=$('ram-max-bar'); if(rmx) rmx.style.left=maxRAM+'%';
+    if(buf){
+      const bp=bar_pct(buf,total);
+      if(bp>maxBuf) maxBuf=bp;
+      $('buf-v').textContent=fmt_mb(buf/1024);$('buf-b').style.width=bp+'%';
+      const bmx=$('buf-max-bar'); if(bmx) bmx.style.left=maxBuf+'%';
+    }
+    if(cch){
+      const cp=bar_pct(cch,total);
+      if(cp>maxCch) maxCch=cp;
+      $('cch-v').textContent=fmt_mb(cch/1024);$('cch-b').style.width=cp+'%';
+      const cmx=$('cch-max-bar'); if(cmx) cmx.style.left=maxCch+'%';
+    }
+  }
+  if(info.swap){
+    const{total,free}=info.swap;
+    if(total>0){
+      const p=Math.round((total-free)/total*100);
+      $('swp-v').textContent=fmt_mb((total-free)/1024)+' / '+fmt_mb(total/1024);
+      if(p>maxSwp) maxSwp=p;
+      $('swp-b').style.width=p+'%';
+      const smx=$('swp-max-bar'); if(smx) smx.style.left=maxSwp+'%';
+    }else{$('swp-v').textContent='none';}
+  }
+}
+
+// ===== TEMP =====
+async function update_temp(){
+  try{
+    const r=await file_exec('/usr/sbin/sensors',['-j']);
+    const out=r.stdout?.trim();
+    if(out){
+      const j=JSON.parse(out); let maxT=0;
+      for(const chip of Object.values(j))
+        for(const[,val]of Object.entries(chip))
+          if(typeof val==='object'&&val!==null)
+            for(const[k,v]of Object.entries(val))
+              if(k.match(/temp\d+_input/)&&typeof v==='number'&&v>maxT) maxT=v;
+      if(maxT>0){
+        const c=Math.round(maxT),el=$('tb-temp');
+        el.textContent=c+'\u00B0C'; el.style.color=c>80?'var(--red)':c>70?'var(--yellow)':'var(--green)'; return;
+      }
+    }
+  }catch(e){}
+  try{
+    const raw=await file_read('/sys/class/thermal/thermal_zone0/temp');
+    if(raw){
+      const val=parseInt(raw),c=val>1000?Math.round(val/1000):val;
+      if(c>0){const el=$('tb-temp');el.textContent=c+'\u00B0C';el.style.color=c>80?'var(--red)':c>70?'var(--yellow)':'var(--green)';return;}
+    }
+  }catch(e){}
+  $('tb-temp').textContent='n/a'; $('tb-temp').style.color='var(--text-muted)';
+}
+
+// ===== DISKS =====
+async function update_disks(){
+  try{
+    const r=await luci_call('luci','getMountPoints',{});
+    const d=r?.[1];
+    if(d){
+      let mounts=null;
+      if(d.result&&Array.isArray(d.result)) mounts=d.result;
+      else if(Array.isArray(d)) mounts=d;
+      else if(typeof d==='object') mounts=Object.values(d).filter(v=>typeof v==='object'&&v!==null&&v.mount);
+      if(mounts&&mounts.length>0){
+        const seen=new Set(),filtered=[];
+        for(const m of mounts){
+          const mp=m.mount||m.target||'--',dev=m.device||'';
+          if(dev==='tmpfs'||dev==='devtmpfs'||dev==='none') continue;
+          if(mp==='/dev'||mp==='/proc'||mp==='/sys'||mp==='/tmp') continue;
+          if(seen.has(mp)) continue;
+          seen.add(mp); filtered.push(m);
+        }
+        let html='';
+        for(const m of filtered){
+          const mp=m.mount||m.target||'--',dev=m.device||'';
+          const size=m.size||0,free=m.free||0,used=size-free;
+          if(size<=0) continue;
+          const pct=Math.round(used/size*100),cls=pct>85?'err':pct>65?'warn':'';
+          html+=`<div class="bw" style="margin-bottom:3px">
+            <div class="blr"><span>${mp} <span style="color:var(--text-faint)">${dev.replace('/dev/','')}</span></span>
+            <span class="bv">${fmt_sz(used)} / ${fmt_sz(size)}</span></div>
+            <div class="bar"><div class="bf ${cls}" style="width:${pct}%"></div></div>
+          </div>`;
+        }
+        if(html){$('disk-p').innerHTML=html;return;}
+      }
+    }
+  }catch(e){}
+  $('disk-p').innerHTML='<div class="met"><span class="ml muted">no mounts</span></div>';
+}
+
+// ===== NVME TEMP (runs inside slow loop, attached to update_disks) =====
+async function update_nvme_temp(){
+  try{
+    const r=await file_exec('/usr/sbin/sensors',['-j']);
+    const out=(r.stdout||'').trim(); if(!out) return;
+    const j=JSON.parse(out);
+    // Look for nvme chip key (e.g. "nvme-pci-0100")
+    for(const [chip,vals] of Object.entries(j)){
+      if(!/nvme/i.test(chip)) continue;
+      for(const [,sensor] of Object.entries(vals)){
+        if(typeof sensor!=='object') continue;
+        for(const [k,v] of Object.entries(sensor)){
+          if(k.match(/temp.*input/i)&&typeof v==='number'&&v>0){
+            const t=Math.round(v);
+            const el=$('nvme-temp');
+            if(el){el.textContent=`NVMe: ${t}°C`;el.style.color=t>70?'var(--red)':t>55?'var(--yellow)':'var(--text-faint)';}
+            return;
+          }
+        }
+      }
+    }
+  }catch(e){}
+}
+
+// ===== NETWORK =====
+let linkSpeeds={},linkSpeedsFetched=false;
+async function update_link_speeds(){
+  if(linkSpeedsFetched&&Object.keys(linkSpeeds).length>0) return;
+  try{
+    const r=await luci_call('network.device','status',{});
+    const devs=r?.[1]; if(!devs) return;
+    const eth=Object.keys(devs).filter(n=>/^eth\d+$/.test(n));
+    for(const name of eth){
+      const d=devs[name];
+      let spd=d.speed;
+      if(!spd||spd<0) spd=d['link-speed']||d['carrier-speed']||null;
+      if(spd&&spd>0){linkSpeeds[name]=spd;continue;}
+      try{const r2=await file_exec('/bin/cat',['/sys/class/net/'+name+'/speed']);const v=parseInt((r2.stdout||'').trim());if(v>0){linkSpeeds[name]=v;continue;}}catch(e){}
+      try{const r2=await file_exec('/usr/sbin/ethtool',[name]);const m=(r2.stdout||'').match(/Speed:\s*(\d+)Mb/);if(m){linkSpeeds[name]=parseInt(m[1]);continue;}}catch(e){}
+    }
+    linkSpeedsFetched=true;
+  }catch(e){}
+}
+async function update_net(){
+  const r=await luci_call('network.device','status',{});
+  const devs=r?.[1]; if(!devs) return;
+  const now=Date.now(); let html='';
+  ifaceSpdMap={};
+  const entries=Object.entries(devs)
+    .filter(([n])=>/^(eth|pppoe|br-|awg|wan|lan)/.test(n))
+    .sort(([a],[b])=>a.localeCompare(b));
+  for(const[name,d]of entries){
+    const s=d.statistics||{};
+    const rx=s.rx_bytes||0,tx=s.tx_bytes||0;
+    const up=/^eth/.test(name)?!!(d.carrier):!!(d.up||d.carrier||(d.flags&&d.flags.up));
+    let spd=Number(d.speed)||0;
+    if(spd<=0) spd=Number(d['link-speed'])||Number(d['carrier-speed'])||0;
+    if(spd<=0&&linkSpeeds[name]) spd=linkSpeeds[name];
+    const spdStr=spd>0?(spd>=1000?(spd/1000).toFixed(spd%1000?1:0)+'G':spd+'M'):'';
+    if(spdStr&&up) ifaceSpdMap[name]=spdStr;
+    let rr='--',tr='--',rxRate=0,txRate=0;
+    if(pNet[name]){
+      const dt=(now-pNet[name].ts)/1000;
+      if(dt>0.5){
+        const rxr=(rx-pNet[name].rx)/dt,txr=(tx-pNet[name].tx)/dt;
+        if(rxr>=0&&rxr<1.25e9){rr=fmt_b(rxr);rxRate=rxr;} else rr='--';
+        if(txr>=0&&txr<1.25e9){tr=fmt_b(txr);txRate=txr;} else tr='--';
+      }
+    }
+    pNet[name]={rx,tx,ts:now};
+    const erx=s.rx_errors||0,etx=s.tx_errors||0;
+    // Traffic color based on rate (bytes/s)
+    let rxCls='rx-dim',txCls='tx-dim';
+    if(rxRate>=25e6) rxCls='rx-hi';       // ≥ 25 MB/s — bright + glow
+    else if(rxRate>=5e6) rxCls='rx-mid';  // 5–25 MB/s — standard color
+    else if(rxRate>=1e6) rxCls='rx-lo';   // 1–5 MB/s — dim-to-color transition
+    if(txRate>=25e6) txCls='tx-hi';
+    else if(txRate>=5e6) txCls='tx-mid';
+    else if(txRate>=1e6) txCls='tx-lo';
+    html+=`<div class="iface">
+      <div class="ifr1"><span class="ifname ${up?'up':'down'}">${name}</span>${spdStr?`<span class="ifspd">${spdStr}</span>`:''}<span class="iflink">${up?'UP':'DOWN'}</span></div>
+      <div class="ifr2"><span class="rx ${rxCls}">\u2193${rr}</span><span class="tx ${txCls}">\u2191${tr}</span>${(erx>0||etx>0)?`<span class="er"> err:${erx+etx}</span>`:''}
+        <span style="margin-left:auto;color:var(--text-faint)">${fmt_sz(rx)}/${fmt_sz(tx)}</span>
+      </div>
+    </div>`;
+  }
+  $('net-p').innerHTML=html||'<div class="met"><span class="ml muted">no interfaces</span></div>';
+  $('ct-bdg').textContent='ct: '+($('ct-act').textContent||'--');
+}
+
+// ===== CONNTRACK =====
+async function update_conntrack(){
+  try{
+    const[cnt,mx]=await Promise.all([file_read('/proc/sys/net/netfilter/nf_conntrack_count'),file_read('/proc/sys/net/netfilter/nf_conntrack_max')]);
+    const c=parseInt(cnt),m=parseInt(mx);
+    if(!isNaN(c)&&!isNaN(m)&&m>0){
+      const pct=Math.round(c/m*100);
+      $('ct-act').textContent=c.toLocaleString(); $('ct-max').textContent=m.toLocaleString();
+      const bar=$('ct-bar'); bar.style.width=Math.min(100,pct)+'%';
+      bar.className='bf blue'+(pct>80?' err':pct>60?' warn':'');
+    }
+  }catch(e){}
+}
+
+// ===== NFT =====
+async function update_nft(){
+  try{
+    const r=await file_exec('/usr/sbin/nft',['-j','list','ruleset']);
+    const out=(r.stdout||'').trim();
+    if(out){
+      const j=JSON.parse(out);
+      const tables=(j.nftables||[]).filter(x=>x.table).length;
+      const chains=(j.nftables||[]).filter(x=>x.chain).length;
+      const rules=(j.nftables||[]).filter(x=>x.rule).length;
+      $('nft-d').textContent=`${tables}t ${chains}c ${rules}r`; return;
+    }
+  }catch(e){}
+  try{
+    const r2=await file_exec('/usr/sbin/nft',['list','tables']);
+    const lines=(r2.stdout||'').trim().split('\n').filter(l=>l.trim());
+    $('nft-d').textContent=lines.length+' tables';
+  }catch(e2){$('nft-d').textContent='n/a';}
+}
+
+// ===== LATENCY =====
+const LAT_TARGETS=[
+  {url:'https://cp.cloudflare.com/generate_204',label:'cf'},
+  {url:'https://www.google.com/generate_204',   label:'ggl'},
+  {url:'https://ya.ru',                         label:'ya'},
+];
+// LAT_GROUPS starts with DIRECT; mihomo proxy groups are appended by init_lat_groups()
+let LAT_GROUPS=[{name:'DIRECT',label:'DIRECT (ISP)'}];
+async function init_lat_groups(){
+  const H={'Content-Type':'application/json'};
+  if(C.mihomo_secret) H['Authorization']='Bearer '+C.mihomo_secret;
+  try{
+    const r=await fetch(C.mihomo_api+'/proxies',{headers:H,signal:AbortSignal.timeout(3000)});
+    const groups=(await r.json()).proxies||{};
+    const dynamic=Object.entries(groups)
+      .filter(([,g])=>['Selector','URLTest','Fallback'].includes(g.type))
+      .map(([n])=>({name:n,label:n}))
+      .sort((a,b)=>a.name.localeCompare(b.name));
+    LAT_GROUPS=[{name:'DIRECT',label:'DIRECT (ISP)'},...dynamic];
+  }catch(e){}
+}
+let latD={},latTS=0;
+const lat_color=ms=>ms==null?'var(--red)':ms<=50?'var(--cyan)':ms<=100?'var(--green)':ms<=200?'var(--yellow)':'var(--red)';
+const lat_cls=ms=>ms==null?'err':ms<=50?'cyan':ms<=100?'ok':ms<=200?'warn':'err';
+
+async function mihomo_delay(proxyName,testUrl){
+  const H={'Content-Type':'application/json'};
+  if(C.mihomo_secret) H['Authorization']='Bearer '+C.mihomo_secret;
+  try{
+    const r=await fetch(C.mihomo_api+'/proxies/'+encodeURIComponent(proxyName)+'/delay?timeout=5000&url='+encodeURIComponent(testUrl),{headers:H,signal:AbortSignal.timeout(6000)});
+    const j=await r.json(); return(j.delay&&j.delay>0)?j.delay:null;
+  }catch(e){return null;}
+}
+async function update_ping(){
+  const tasks=[];
+  for(const g of LAT_GROUPS) for(const t of LAT_TARGETS) tasks.push({key:g.name+'|'+t.label,group:g.name,url:t.url});
+  const results=await Promise.allSettled(tasks.map(async t=>({key:t.key,ms:await mihomo_delay(t.group,t.url)})));
+  for(const r of results) if(r.status==='fulfilled'&&r.value) latD[r.value.key]=r.value.ms;
+  latTS=Date.now(); render_ping();
+}
+function render_ping(){
+  let html='';
+  if(latTS>0){
+    const d=new Date(latTS);
+    html+=`<div class="ds" style="margin-bottom:3px"><span class="dl">last check</span><span class="dv" style="color:var(--text-faint)">${[d.getHours(),d.getMinutes(),d.getSeconds()].map(x=>String(x).padStart(2,'0')).join(':')}</span></div>`;
+  }
+  for(const g of LAT_GROUPS){
+    html+=`<div style="margin-bottom:3px"><div style="font-size:var(--text-xs);color:var(--text-muted);margin-bottom:1px">${g.label}</div>`;
+    for(const t of LAT_TARGETS){
+      const ms=latD[g.name+'|'+t.label];
+      const bp=ms?Math.min(100,ms/500*100):100,bc=lat_color(ms),cls=lat_cls(ms);
+      const lkey=`${g.name}:${t.label}`;
+      if(ms!=null){ if(!maxLat[lkey]||ms>maxLat[lkey]) maxLat[lkey]=ms; }
+      const bpmax=maxLat[lkey]?Math.min(100,maxLat[lkey]/500*100):0;
+      html+=`<div style="display:flex;gap:4px;align-items:center;margin-bottom:1px">
+        <span style="font-size:var(--text-xxs);color:var(--text-faint);width:18px;flex-shrink:0">${t.label}</span>
+        <div class="pbar" style="flex:1;position:relative"><div class="pbf" style="width:${bp}%;background:${bc}"></div><div style="position:absolute;top:0;bottom:0;left:${bpmax}%;width:2px;background:rgba(255,255,255,0.18);border-radius:1px"></div></div>
+        <span class="pval ${cls}">${ms!=null?ms+'ms':'FAIL'}</span>
+      </div>`;
+    }
+    html+=`</div>`;
+  }
+  $('ping-p').innerHTML=html;
+}
+
+// ===== WAN INFO =====
+async function update_wan_info(){
+  try{
+    const ifd=await luci_call('network.interface','dump',{});
+    const ifaces=ifd?.[1]?.interface||[];
+    const wan=ifaces.find(i=>i.interface==='wan')||ifaces.find(i=>i.proto==='pppoe');
+    if(wan){
+      let h='';
+      const ip4=wan['ipv4-address']?.[0]?.address;
+      if(ip4) h+=`<div class="ds"><span class="dl">WAN IP</span><span class="dv ok">${ip4}</span></div>`;
+      const gw=wan.route?.find(r=>r.target==='0.0.0.0')?.nexthop;
+      if(gw) h+=`<div class="ds"><span class="dl">gateway</span><span class="dv">${gw}</span></div>`;
+      h+=`<div class="ds"><span class="dl">proto</span><span class="dv">${wan.proto||'--'}</span></div>`;
+      if(wan.uptime>0){
+        const wu=wan.uptime,d=Math.floor(wu/86400),hr=Math.floor((wu%86400)/3600),m=Math.floor((wu%3600)/60),s=wu%60;
+        h+=`<div class="ds"><span class="dl">WAN uptime</span><span class="dv cyan">${d?d+'d ':''}${[hr,m,s].map(x=>String(x).padStart(2,'0')).join(':')}</span></div>`;
+      }
+      const dns=wan['dns-server']||[];
+      if(dns.length) h+=`<div class="ds"><span class="dl">DNS (ISP)</span><span class="dv" style="color:var(--text-faint)">${dns.slice(0,2).join(', ')}</span></div>`;
+      $('wan-p').innerHTML=h;
+    }
+  }catch(e){}
+}
+
+// ===== SERVICE ACTIONS & LOGS =====
+let currentLogSvc = null;
+
+async function svc_restart(name, btn){
+  btn.classList.add('spinning');
+  try{
+    const r = await file_exec('/etc/init.d/'+name,['restart']);
+    const ok = (r.code===0) || (r.stdout||'').length>0 || r.code===undefined;
+    btn.style.color = ok ? 'var(--green)' : 'var(--red)';
+    setTimeout(()=>{btn.style.color='';btn.classList.remove('spinning');}, 1500);
+  }catch(e){
+    btn.style.color='var(--red)';
+    setTimeout(()=>{btn.style.color='';btn.classList.remove('spinning');}, 1500);
+  }
+}
+
+async function show_logs(name){
+  currentLogSvc = name;
+  $('svc-p').innerHTML='<div class="met"><span class="ml" style="color:var(--text-faint)">loading logs...</span></div>';
+  await render_logs(name);
+}
+
+function close_logs(){
+  currentLogSvc = null;
+  update_services();
+}
+
+async function render_logs(name){
+  if(currentLogSvc !== name) return;
+  try{
+    const r = await file_exec('/sbin/logread',['-e', name]);
+    let lines = (r.stdout||'').trim().split('\n').filter(l=>l.trim());
+    if(lines.length > 25) lines = lines.slice(-25);
+    const lh = lines.length
+      ? lines.map(l=>`<div class="log-line">${l.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>`).join('')
+      : '<div class="log-line" style="color:var(--text-faint)">no recent logs found</div>';
+    if(currentLogSvc !== name) return;
+    $('svc-p').innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;padding-bottom:2px;border-bottom:1px solid var(--border-2)">
+        <span style="font-size:var(--text-xs);color:var(--cyan)">&gt; ${name}</span>
+        <button onclick="close_logs()" class="svc-action" style="color:var(--red)" title="Close logs">&#10005;</button>
+      </div><div>${lh}</div>`;
+  }catch(e){
+    if(currentLogSvc===name)
+      $('svc-p').innerHTML=`<div class="met"><span class="ml err">error reading logs</span></div><div style="margin-top:4px"><button onclick="close_logs()" class="svc-action" style="color:var(--red)">&#10005; close</button></div>`;
+  }
+}
+
+// ===== SERVICES =====
+// All known popular services — only installed ones will be shown (see update_services)
+const SVC_DAEMON=[
+  // Базовые системные
+  {name:'uhttpd',            label:'LuCI (uhttpd)'},
+  {name:'network',           label:'Network'},
+  {name:'dnsmasq',           label:'dnsmasq'},
+  {name:'dropbear',          label:'SSH'},
+  {name:'rpcd',              label:'rpcd'},
+  {name:'sysntpd',           label:'ntpd'},
+  {name:'cron',              label:'crond'},
+  {name:'mwan3',             label:'mwan3'},
+  {name:'watchcat',          label:'Watchcat'},
+  {name:'ttyd',              label:'Web Terminal'},
+  // Обход блокировок и Прокси
+  {name:'zapret',            label:'zapret (DPI Bypass)'},
+  {name:'podkop',            label:'Podkop (Routing)'},
+  {name:'byedpi',            label:'ByeDPI'},
+  {name:'homeproxy',         label:'HomeProxy'},
+  {name:'nikki',             label:'Nikki (Mihomo)'},
+  {name:'mihomo',            label:'Mihomo Core'},
+  {name:'openproxy',         label:'OpenProxy'},
+  {name:'openclash',         label:'OpenClash'},
+  {name:'passwall',          label:'Passwall'},
+  {name:'sing-box',          label:'sing-box'},
+  {name:'xray',              label:'Xray Core'},
+  {name:'v2ray',             label:'V2Ray'},
+  {name:'shadowsocks-libev', label:'Shadowsocks'},
+  {name:'ruantiblock',       label:'ruantiblock'},
+  {name:'tor',               label:'Tor Daemon'},
+  {name:'i2pd',              label:'I2P Router (i2pd)'},
+  {name:'tun2socks',         label:'tun2socks'},
+  // VPN и Mesh-сети
+  {name:'openvpn',           label:'OpenVPN'},
+  {name:'wireguard',         label:'WireGuard'},
+  {name:'amneziawg',         label:'AmneziaWG'},
+  {name:'ipsec',             label:'StrongSwan (IPSec)'},
+  {name:'xl2tpd',            label:'L2TP'},
+  {name:'tailscale',         label:'Tailscale'},
+  {name:'zerotier',          label:'ZeroTier'},
+  {name:'netbird',           label:'Netbird'},
+  {name:'openconnect',       label:'OpenConnect'},
+  // DNS и Блокировщики
+  {name:'adguardhome',       label:'AdGuard Home'},
+  {name:'adblock',           label:'adblock'},
+  {name:'banip',             label:'banIP'},
+  {name:'unbound',           label:'Unbound'},
+  {name:'stubby',            label:'Stubby (DoT)'},
+  // Docker, NAS и Файлы
+  {name:'dockerd',           label:'Docker Engine'},
+  {name:'samba4',            label:'Samba 4'},
+  {name:'ksmbd',             label:'Kernel SMB'},
+  {name:'nfsd',              label:'NFS Server'},
+  {name:'minidlna',          label:'miniDLNA'},
+  {name:'gerbera',           label:'Gerbera (UPnP)'},
+  {name:'transmission',      label:'Transmission'},
+  {name:'qbittorrent',       label:'qBittorrent'},
+  {name:'aria2',             label:'aria2'},
+  {name:'vsftpd',            label:'FTP (vsftpd)'},
+  {name:'p910nd',            label:'Print Server'},
+  {name:'cupsd',             label:'CUPS Print Server'},
+  // Сеть, Мониторинг, IoT и Телефония
+  {name:'miniupnpd',         label:'UPnP'},
+  {name:'vnstat',            label:'vnStat'},
+  {name:'smartd',            label:'S.M.A.R.T. Monitor'},
+  {name:'nginx',             label:'nginx'},
+  {name:'haproxy',           label:'HAProxy'},
+  {name:'mosquitto',         label:'MQTT'},
+  {name:'asterisk',          label:'Asterisk (VoIP)'},
+  {name:'owserver',          label:'1-Wire Server'},
+  {name:'knxd',              label:'KNX Daemon'},
+  {name:'collectd',          label:'collectd'},
+  {name:'telegraf',          label:'Telegraf'},
+  {name:'opentracker',       label:'opentracker'},
+]
+const SVC_ONESHOT=[
+  {name:'firewall',label:'firewall'},
+  {name:'sqm',     label:'SQM/CAKE'},
+  {name:'nft-qos', label:'nft-QoS'},
+  {name:'banip',   label:'banIP'},
+  {name:'adblock', label:'adblock'},
+];
+async function update_services(){
+  if(currentLogSvc){ await render_logs(currentLogSvc); return; }
+  const r=await luci_call('service','list',{});
+  const svc=r?.[1]||{};
+  let html='';
+  for(const s of SVC_DAEMON){
+    const entry=svc[s.name];
+    if(!entry) continue; // hide if not installed
+    let running=false;
+    if(entry?.instances) for(const inst of Object.values(entry.instances)) if(inst.running){running=true;break;}
+    html+=`<div class="svc">
+      <button class="svc-action svc-restart" title="Restart ${s.label}" onclick="svc_restart('${s.name}',this)">&#8635;</button>
+      <button class="svc-action" title="Logs: ${s.label}" onclick="show_logs('${s.name}')">&#9776;</button>
+      <div class="dot ${running?'ok':'err'}"></div>
+      <span class="sname">${s.label}</span>
+      <span class="sstatus ${running?'ok':'err'}">${running?'UP':'DOWN'}</span>
+    </div>`;
+  }
+  for(const s of SVC_ONESHOT){
+    if(!svc[s.name]) continue; // hide if not installed
+    html+=`<div class="svc">
+      <button class="svc-action svc-restart" title="Reload ${s.label}" onclick="svc_restart('${s.name}',this)">&#8635;</button>
+      <button class="svc-action" title="Logs: ${s.label}" onclick="show_logs('${s.name}')">&#9776;</button>
+      <div class="dot warn"></div>
+      <span class="sname">${s.label}</span>
+      <span class="sstatus" style="color:var(--yellow)">LOADED</span>
+    </div>`;
+  }
+  $('svc-p').innerHTML=html;
+}
+
+// ===== MIHOMO =====
+async function update_mihomo(){
+  const H={'Content-Type':'application/json'};
+  if(C.mihomo_secret) H['Authorization']='Bearer '+C.mihomo_secret;
+  try{
+    const[cfg_r,prx_r]=await Promise.all([
+      fetch(C.mihomo_api+'/configs',{headers:H,signal:AbortSignal.timeout(2500)}),
+      fetch(C.mihomo_api+'/proxies',{headers:H,signal:AbortSignal.timeout(3000)}),
+    ]);
+    const mode=(await cfg_r.json()).mode||'rule';
+    const mb=$('mi-mode'); mb.textContent=mode.toUpperCase(); mb.className='badge b-cyan';
+    const groups=(await prx_r.json()).proxies||{};
+    // Dynamic: show all Selector/URLTest/Fallback groups, sorted
+    const GNAMES=Object.entries(groups)
+      .filter(([,g])=>['Selector','URLTest','Fallback'].includes(g.type))
+      .map(([n])=>n)
+      .sort();
+    let html='';
+    for(const gn of GNAMES){
+      const g=groups[gn]; if(!g) continue;
+      const all=(g.all||[]).length,now_n=g.now||'--',type=g.type||'';
+      let alive=0;
+      for(const nn of(g.all||[])){const n=groups[nn];if(n?.history?.length>0&&n.history[n.history.length-1].delay>0)alive++;}
+      const tc=type==='URLTest'?'var(--cyan)':type==='Fallback'?'var(--yellow)':'var(--purple)';
+      const tl=type==='URLTest'?'url-test':type==='Fallback'?'fallback':type==='Selector'?'select':type.toLowerCase();
+      html+=`<div class="vgrp"><div class="vgh"><span class="vgname">${gn}</span><span class="vgtype" style="color:${tc}">${tl}</span></div>
+        <div class="vgactive" title="${now_n}">\u25B6 ${now_n}</div>
+        ${all>0?`<div class="vgstats"><span class="vst-ok">\u2713 ${alive}</span><span class="vst-err">\u2717 ${all-alive}</span><span>/ ${all}</span></div>`:''}
+      </div>`;
+    }
+    $('vpn-p').innerHTML=html||'<div class="met"><span class="ml muted">no groups</span></div>';
+  }catch(e){
+    $('vpn-p').innerHTML='<div class="svc"><div class="dot err"></div><span class="sname">mihomo API</span><span class="sstatus err">OFFLINE</span></div>';
+    const b=$('mi-mode'); b.className='badge b-err'; b.textContent='DOWN';
+  }
+}
+
+// ===== ADGUARD =====
+async function agh_api(endpoint){
+  const r=await file_exec('/usr/bin/curl',['-s','-m','3','-u',C.adguard_user+':'+C.adguard_pass,'http://'+C.adguard_host+':'+C.adguard_port+endpoint]);
+  const out=r.stdout?.trim(); if(!out) return null;
+  try{return JSON.parse(out);}catch(e){return null;}
+}
+async function update_adguard(){
+  try{
+    const[stats,status]=await Promise.all([agh_api('/control/stats'),agh_api('/control/status')]);
+    let html='';
+    if(stats){
+      const s=stats;
+      const bp=s.num_dns_queries>0?(s.num_blocked_filtering/s.num_dns_queries*100).toFixed(1):'0.0';
+      html+=`<div class="ds"><span class="dl">queries today</span><span class="dv ok">${(s.num_dns_queries||0).toLocaleString()}</span></div>`;
+      html+=`<div class="ds"><span class="dl">blocked</span><span class="dv warn">${(s.num_blocked_filtering||0).toLocaleString()} (${bp}%)</span></div>`;
+      html+=`<div class="ds"><span class="dl">avg latency</span><span class="dv">${s.avg_processing_time?((s.avg_processing_time*1000).toFixed(1)+'ms'):'--'}</span></div>`;
+      if(s.top_blocked_domains?.length){
+        html+='<hr>';
+        for(const[d,c]of s.top_blocked_domains.slice(0,3)){
+          html+=`<div class="ds"><span class="dl" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:70%">${d}</span><span class="dv warn">${c}</span></div>`;
+        }
+      }
+    }
+    if(status){
+      if(html) html+='<hr>';
+      html+=`<div class="ds"><span class="dl">filtering</span><span class="dv ${status.protection_enabled?'ok':'err'}">${status.protection_enabled?'ON':'OFF'}</span></div>`;
+      if(status.dns_addresses?.length){
+        html+=`<div class="ds"><span class="dl">upstream DNS</span><span class="dv" style="color:var(--text-muted)">${status.dns_addresses[0]}:${status.dns_port||53}</span></div>`;
+      }
+    }
+    const bdg=$('agh-bdg');
+    if(stats||status){bdg.className='badge b-ok';bdg.textContent='UP';}
+    $('dns-p').innerHTML=html||'<div class="met"><span class="ml muted">no data</span></div>';
+  }catch(e){
+    $('dns-p').innerHTML='<div class="svc"><div class="dot err"></div><span class="sname">AdGuard API</span><span class="sstatus err">OFFLINE</span></div>';
+    const bdg=$('agh-bdg'); bdg.className='badge b-err'; bdg.textContent='DOWN';
+  }
+}
+
+// ===== CLIENTS (DHCP leases) =====
+// Samsung phone OUI list (first 8 chars of MAC, lowercase)
+const SAMSUNG_OUI = [
+  'f4:9f:54','e0:ac:cb','c0:89:ab','50:01:d4','d0:22:be','dc:72:9b','8c:f5:a3','54:88:0e',
+  '2c:0e:3d','40:4e:36','cc:07:ab','d4:88:90','68:27:37','40:0e:85','90:18:7c','00:07:ab',
+  'c4:57:6e','7c:0b:c6','14:a3:64','a4:50:46','f0:ee:10','48:5a:b6','00:26:37',
+  '00:24:54','1c:af:f7','c4:42:02','0c:14:20','38:2d:e8','58:c3:8b',
+];
+// Known wired clients (adjust IPs to match your setup)
+const WIRED_IPS = new Set([]); // add wired client IPs: ['192.168.1.2','192.168.1.3']
+// TV / Android TV by hostname pattern
+const TV_PATTERNS = [/android.*tv/i,/smarttv/i,/tv$/i,/television/i];
+
+async function update_clients(){
+  let leases=[];
+  // Read dnsmasq leases
+  try{
+    const raw=await file_read('/tmp/dhcp.leases');
+    if(raw){
+      for(const line of raw.split('\n')){
+        const p=line.trim().split(/\s+/);
+        if(p.length>=4) leases.push({ts:p[0],mac:p[1],ip:p[2],name:p[3]==='*'?'':p[3]});
+      }
+    }
+  }catch(e){}
+
+  if(!leases.length){
+    $('clients-p').innerHTML='<div class="met"><span class="ml" style="color:var(--text-faint)">no leases (check /tmp/dhcp.leases)</span></div>';
+    $('cl-bdg').textContent='0'; $('cl-bdg').className='badge'; $('cl-bdg').style.cssText='background:var(--surface-3);color:var(--text-muted)';
+    return;
+  }
+
+  // Sort by last IP octet
+  leases.sort((a,b)=>{
+    const ai=parseInt(a.ip.split('.')[3])||0, bi=parseInt(b.ip.split('.')[3])||0;
+    return ai-bi;
+  });
+
+  // Get wired interface speeds for display
+  const wiredSpdStr = Object.entries(ifaceSpdMap)
+    .filter(([n])=>/^eth/.test(n)||/^br-lan/.test(n))
+    .map(([,s])=>s)[0]||'';
+
+  let html='';
+  for(const l of leases){
+    const mac=(l.mac||'').toLowerCase().trim();
+    const macShort=mac.replace(/:/g,'').slice(0,6);
+    const isWired=WIRED_IPS.has(l.ip);
+    const isTV=TV_PATTERNS.some(p=>p.test(l.name||''));
+    const isSamsung=SAMSUNG_OUI.some(p=>mac.startsWith(p));
+
+    let iconClass,label;
+    if(isTV){
+      iconClass='eth'; label='TV 100M';
+    }else if(isWired){
+      iconClass='eth'; label=wiredSpdStr?wiredSpdStr+' wired':'wired';
+    }else if(isSamsung){
+      iconClass='w5'; label='5GHz';
+    }else{
+      iconClass='w24'; label='WiFi';
+    }
+
+    // WiFi icon SVG-like characters
+    const icons={w5:'⊙',w24:'○',eth:'▫'};
+    const displayName=(l.name&&l.name!=='*'&&l.name!=='')?l.name:mac.toUpperCase().replace(/:/g,'').slice(0,12);
+
+    html+=`<div class="client-row">
+      <i class="cicon ${iconClass}" title="${label}">${icons[iconClass]||'·'}</i>
+      <span class="cname" title="${mac}">${displayName}</span>
+      <span class="cip">.${l.ip.split('.')[3]}</span>
+      <span class="cspd">${label}</span>
+    </div>`;
+  }
+
+  $('clients-p').innerHTML=html;
+  const bdg=$('cl-bdg');
+  bdg.textContent=leases.length;
+  bdg.className='badge b-ok';
+  bdg.style.cssText='';
+}
+
+// ===== WIFI AP / LOCAL WIRELESS =====
+// Supports two modes:
+//  1. External AP (C.wifi_ap set): ping + curl reachability check, show admin link
+//  2. Local wireless (C.wifi_ap empty): read local radios via iwinfo + hostapd_cli
+
+async function init_wifi_admin_link(){
+  const ap = C.wifi_ap;
+  const link = document.getElementById('wifi-admin-link');
+  const tbLink = $('tb-wifiap-link');
+  if(ap && C.wifi_ap_port){
+    const proto = C.wifi_ap_https ? 'https' : 'http';
+    const url = proto+'://'+ap+':'+C.wifi_ap_port+'/';
+    if(link){ link.href=url; link.style.display=''; }
+    if(tbLink) tbLink.innerHTML='<a class="tb-link" href="'+url+'" target="_blank" rel="noopener">WiFi AP</a>';
+  } else if(!ap){
+    // local mode: no external link needed, but show a local-wifi icon
+    if(link) link.style.display='none';
+    if(tbLink) tbLink.innerHTML='<span class="tb-link" style="opacity:.5" title="Local Wi-Fi">Wi-Fi</span>';
+  }
+}
+
+async function update_wifi_ap(){
+  const ap = C.wifi_ap;
+
+  // ---- MODE 1: external AP ----
+  if(ap){
+    let reachable = false;
+    try{
+      const r = await file_exec('/bin/ping',['-c','1','-W','2',ap]);
+      if((r.stdout||'').includes('0% packet loss')||(r.stdout||'').includes('1 received')) reachable=true;
+    }catch(e){}
+    if(!reachable){
+      try{
+        const proto = C.wifi_ap_https ? 'https' : 'http';
+        const port  = C.wifi_ap_port || (C.wifi_ap_https ? '443' : '80');
+        const r = await file_exec('/usr/bin/curl',['-s','-k','-m','2','-o','/dev/null','-w','%{http_code}',proto+'://'+ap+':'+port+'/']);
+        const code = parseInt((r.stdout||'').trim());
+        if(code>0&&code<600) reachable=true;
+      }catch(e){}
+    }
+
+    const bdg = $('wifi-bdg');
+    bdg.textContent = reachable?'ONLINE':'OFFLINE';
+    bdg.className   = 'badge '+(reachable?'b-ok':'b-err');
+    bdg.style.cssText = '';
+
+    let html = `<div class="wifi-section">
+    <div class="wifi-sh">
+      <span class="wifi-sname">WiFi AP</span>
+      <span class="${reachable?'sstatus ok':'sstatus err'}">${reachable?'• up':'• down'}</span>
+    </div>
+    <div class="wrow"><span class="wlabel">IP</span><span class="wval">${ap}</span></div>
+    <div class="wrow"><span class="wlabel">mode</span><span class="wval">Access Point</span></div>`;
+    if(C.wifi_ap_port){
+      const proto = C.wifi_ap_https ? 'https' : 'http';
+      html += `<div class="wrow"><span class="wlabel">admin</span>
+      <a class="wlink" href="${proto}://${ap}:${C.wifi_ap_port}/" target="_blank" rel="noopener">:${C.wifi_ap_port} ↗</a>
+    </div>`;
+    }
+    html += `</div>`;
+
+    // Try to get local radio info from this router's ubus (useful even with ext AP)
+    html += await _wifi_local_radios(false);
+    $('wifi-p').innerHTML = html;
+    return;
+  }
+
+  // ---- MODE 2: local wireless on this router ----
+  const bdg = $('wifi-bdg');
+  let html = '';
+  const radios = await _wifi_local_radios(true);
+  if(radios){
+    bdg.textContent = 'LOCAL';
+    bdg.className   = 'badge b-cyan';
+    bdg.style.cssText = '';
+    html = radios;
+  } else {
+    bdg.textContent = 'N/A';
+    bdg.className   = 'badge';
+    bdg.style.cssText = 'background:var(--surface-3);color:var(--text-muted)';
+    html = '<div class="met"><span class="ml muted">no wireless detected</span></div>';
+  }
+  $('wifi-p').innerHTML = html;
+}
+
+// Reads local radio interfaces via iwinfo and hostapd_cli
+// fullMode=true: show full info; false: just append a small radio status block
+async function _wifi_local_radios(fullMode){
+  let result = '';
+
+  // 1. Try iwinfo list to get interfaces
+  let ifaces = [];
+  try{
+    const r = await file_exec('/usr/bin/iwinfo',['--version']);
+    if(r && (r.stdout||r.stderr)){
+      // iwinfo available — get interface list from /sys/class/net
+      const sysnet = await file_read('/proc/net/dev');
+      if(sysnet){
+        const lines = sysnet.split('\n').slice(2);
+        for(const l of lines){
+          const name = l.split(':')[0].trim();
+          if(/^wl|^ath|^ra|^mt|^brcm|^wlan/.test(name)) ifaces.push(name);
+        }
+      }
+    }
+  }catch(e){}
+
+  // Fallback: scan /sys/class/net for wireless (check if phy80211 symlink exists concept)
+  if(!ifaces.length){
+    try{
+      const r2 = await file_exec('/bin/ls',['/sys/class/net/']);
+      const names = (r2.stdout||'').split('\n').map(s=>s.trim()).filter(Boolean);
+      for(const n of names){
+        if(/^wl|^ath|^ra|^wlan/.test(n)) ifaces.push(n);
+      }
+    }catch(e){}
+  }
+
+  // Try wireless ubus: network.wireless status
+  let wlStatus = null;
+  try{
+    const r = await luci_call('network.wireless','status',{});
+    if(r&&r[1]) wlStatus = r[1];
+  }catch(e){}
+
+  // Build from ubus wireless status (best source)
+  if(wlStatus && Object.keys(wlStatus).length){
+    for(const [radio, rdata] of Object.entries(wlStatus)){
+      const up = rdata.up || false;
+      const cfg = rdata.config || {};
+      const band = cfg.band || '';
+      const channel = cfg.channel || '?';
+      const hwmode = cfg.hwmode || cfg.htmode || '';
+      const txpow = cfg.txpower || '';
+      const bssids = rdata.interfaces || [];
+      const ssids = bssids.map(i=>i.config?.ssid||'').filter(Boolean);
+      const clients_total = bssids.reduce((s,i)=>{
+        const n = (i.ifname && typeof i.num_sta !== 'undefined') ? i.num_sta : 0;
+        return s + n;
+      }, 0);
+
+      const freqLabel = band==='2g'||hwmode.includes('g')&&!hwmode.includes('a') ? '2.4 GHz' :
+                        band==='5g'||hwmode.includes('a') ? '5 GHz' :
+                        band==='6g' ? '6 GHz' : radio;
+
+      result += `<div class="wifi-section">
+    <div class="wifi-sh">
+      <span class="wifi-sname">${freqLabel}</span>
+      <span class="${up?'sstatus ok':'sstatus err'}">${up?'• up':'• down'}</span>
+    </div>`;
+      if(ssids.length) result += `<div class="wrow"><span class="wlabel">SSID</span><span class="wval" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${ssids.join(', ')}</span></div>`;
+      result += `<div class="wrow"><span class="wlabel">channel</span><span class="wval">${channel}</span></div>`;
+      if(hwmode) result += `<div class="wrow"><span class="wlabel">mode</span><span class="wval">${hwmode}</span></div>`;
+      if(clients_total>0||fullMode) result += `<div class="wrow"><span class="wlabel">clients</span><span class="wval">${clients_total}</span></div>`;
+      result += `</div>`;
+    }
+    if(result) return result;
+  }
+
+  // Fallback: iwinfo per-interface
+  if(ifaces.length){
+    for(const iface of ifaces.slice(0,4)){
+      try{
+        const r = await file_exec('/usr/bin/iwinfo',[iface,'info']);
+        const out = r.stdout||'';
+        const ssid = (out.match(/ESSID: "([^"]*)"/))||[];
+        const chan = (out.match(/Channel: (\d+)/)||[]);
+        const mode = (out.match(/Mode: (\w+)/)||[]);
+        const txpow= (out.match(/Tx-Power: (\d+ dBm)/)||[]);
+        const qual = (out.match(/Link Quality: ([\d/]+)/)||[]);
+        result += `<div class="wifi-section">
+    <div class="wifi-sh">
+      <span class="wifi-sname">${iface}</span>
+      <span class="sstatus ok">• up</span>
+    </div>`;
+        if(ssid[1]) result += `<div class="wrow"><span class="wlabel">SSID</span><span class="wval">${ssid[1]}</span></div>`;
+        if(chan[1])  result += `<div class="wrow"><span class="wlabel">channel</span><span class="wval">${chan[1]}</span></div>`;
+        if(mode[1]) result += `<div class="wrow"><span class="wlabel">mode</span><span class="wval">${mode[1]}</span></div>`;
+        if(txpow[1])result += `<div class="wrow"><span class="wlabel">tx-power</span><span class="wval">${txpow[1]}</span></div>`;
+        result += `</div>`;
+      }catch(e){}
+    }
+    if(result) return result;
+  }
+
+  return fullMode ? '' : '';
+}
+
+// ===== NTP =====
+async function update_ntp_sync(){
+  try{
+    const r=await file_exec('/sbin/logread',['-e','ntpd']);
+    const out=(r.stdout||'').trim();
+    if(out){
+      const lines=out.split('\n'); let last=null;
+      for(let i=lines.length-1;i>=0;i--)
+        if(/synced|offset|reply from|stratum|adjusting/.test(lines[i])){last=lines[i];break;}
+      if(!last&&lines.length) last=lines[lines.length-1];
+      if(last){
+        const tm=last.match(/(\d{2}:\d{2}:\d{2})/);
+        $('tb-ntp').textContent='ntp:'+(tm?tm[1].slice(0,5):'ok');
+        $('tb-ntp').style.color='var(--text-muted)'; return;
+      }
+    }
+  }catch(e){}
+  try{
+    const r=await luci_call('service','list',{name:'sysntpd'});
+    const svc=r?.[1]?.sysntpd||r?.[1]; let running=false;
+    if(svc?.instances) for(const inst of Object.values(svc.instances)) if(inst.running){running=true;break;}
+    if(running){$('tb-ntp').textContent='ntp:ok';$('tb-ntp').style.color='var(--text-muted)';return;}
+  }catch(e){}
+  $('tb-ntp').textContent='ntp:?'; $('tb-ntp').style.color='var(--yellow)';
+}
+
+// ===== MAIN LOOP =====
+async function init(){
+  try{await luci_login();}catch(e){console.warn('login',e);}
+  await Promise.allSettled([init_cores(), update_board(), init_lat_groups()]);
+  init_wifi_admin_link();
+  async function fast(){ await Promise.allSettled([update_cpu(),update_sysinfo(),update_net(),update_temp()]); setTimeout(fast,C.fast); }
+  async function slow(){ await Promise.allSettled([update_disks(),update_nvme_temp(),update_conntrack(),update_nft(),update_services(),update_wan_info(),update_link_speeds()]); setTimeout(slow,C.slow); }
+  async function vpn(){ await Promise.allSettled([update_mihomo(),update_adguard()]); setTimeout(vpn,C.vpn); }
+  async function ping(){ await update_ping(); setTimeout(ping,C.ping); }
+  async function clients(){ await update_clients(); setTimeout(clients,C.clients); }
+  async function wifi(){ await update_wifi_ap(); setTimeout(wifi,C.wifi); }
+  fast(); slow(); vpn(); ping(); clients(); wifi(); update_ntp_sync();
+}
+init();
+</script>
+</body>
+</html>

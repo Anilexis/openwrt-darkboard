@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OpenWrt Dashboard — DEMO (Static)</title>
+<style>
+:root {
+  --font-mono: 'JetBrains Mono', 'Consolas', 'SF Mono', monospace;
+  --text-xxs:  clamp(0.56rem, 0.5rem  + 0.2vw, 0.63rem);
+  --text-xs:   clamp(0.63rem, 0.58rem + 0.2vw, 0.72rem);
+  --text-sm:   clamp(0.72rem, 0.65rem + 0.2vw, 0.82rem);
+  --text-base: clamp(0.8rem,  0.72rem + 0.2vw, 0.92rem);
+  --bg:        #0d0f0e;
+  --surface:   #111413;
+  --surface-2: #161918;
+  --surface-3: #1c1f1e;
+  --border:    #252b2a;
+  --border-2:  #2e3836;
+  --text:      #c6cfca;
+  --text-muted:#859e92;
+  --text-faint:#52635d;
+  --green:     #38b562; --green-dim: #193b25;
+  --yellow:    #cfa040; --yellow-dim:#6e4e10;
+  --red:       #de4f4f; --red-dim:   #5e1e1e;
+  --blue:      #4a94e8; --blue-dim:  #192f54;
+  --cyan:      #35c4b4; --cyan-dim:  #174d47;
+  --purple:    #9268d8;
+  --orange:    #d88838;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100vh;width:100vw;margin:0;padding:0;overflow:hidden;background:var(--bg);color:var(--text);font-family:var(--font-mono);font-size:var(--text-base);line-height:1.4;-webkit-font-smoothing:antialiased;}
+
+/* ============================================================ TOPBAR */
+.topbar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 10px;height:24px;
+  background:var(--surface);border-bottom:1px solid var(--border);
+  font-size:var(--text-xs);color:var(--text-muted);flex-shrink:0;overflow:hidden;
+}
+.tb-l,.tb-r{display:flex;align-items:center;gap:8px;flex-wrap:nowrap;min-width:0;}
+.tb-title{color:var(--green);font-weight:700;letter-spacing:.06em;font-size:var(--text-sm);white-space:nowrap;}
+.tb-sep{color:var(--border-2);flex-shrink:0;}
+.tb-clock{color:var(--text);font-weight:600;}
+.tb-uptime{color:var(--cyan);}
+.tb-links{display:flex;gap:4px;margin-left:4px;flex-wrap:nowrap;}
+.tb-link{
+  color:var(--text-muted);text-decoration:none;font-size:var(--text-xxs);
+  padding:1px 5px;border:1px solid var(--border-2);border-radius:2px;
+  transition:color .15s,border-color .15s;white-space:nowrap;
+}
+.tb-link:hover{color:var(--cyan);border-color:var(--cyan-dim);}
+
+/* ============================================================ DASH WRAPPER */
+.dash{display:flex;flex-direction:column;height:100vh;width:100vw;overflow:hidden;}
+
+/* ============================================================
+   DESKTOP GRID  4col x 3row
+   Columns: 1fr  2fr  1fr  1fr
+   col1 col2(wide) col3 col4
+
+   Row 1: CPU | MEMORY | STORAGE | SERVICES(spans r1-r2)
+   Row 2: INTERFACES(spans r2-r3) | LATENCY | WAN | (services cont.)
+   Row 3: (iface cont.) | MIHOMO | ADGUARD | WIFI
+   + CLIENTS panel: sits between INTERFACES and MIHOMO row
+     Actually: col1 row2 = interfaces, col1 row3 = clients
+     But interfaces needs height — let's make it span r2 only and clients r3 col1
+
+   Final:
+   R1: cpu | memory | storage | services↕2
+   R2: interfaces↕2 | latency | wan | (svc)
+   R3: (iface) | mihomo | adguard | wifi
+   
+   Wait — interfaces spans 2 rows (r2-r3), so col1 r3 is taken by interfaces.
+   CLIENTS needs its own column-1 cell.
+
+   SOLUTION: Make the grid 4 rows for col1 and col2-4 uses 3 rows.
+   Use named grid areas for precision.
+   ============================================================ */
+.grid{
+  display:grid;
+  width:100%;
+  box-sizing:border-box;
+  grid-template-columns: 1fr 2fr 1fr 1fr;
+  grid-template-rows: minmax(0,1.2fr) minmax(0,1fr) minmax(0,1fr);
+  grid-template-areas:
+    "cpu    memory  storage  services"
+    "ifaces latency wan      services"
+    "clients mihomo  adguard  wifi";
+  gap:1px;
+  background:var(--border);
+  flex:1;min-height:0;
+}
+
+/* Grid area assignments */
+.cell-cpu       {grid-area:cpu;}
+.cell-memory    {grid-area:memory;}
+.cell-storage   {grid-area:storage;}
+.cell-services  {grid-area:services;}
+.cell-interfaces{grid-area:ifaces;}
+.cell-latency   {grid-area:latency;}
+.cell-wan       {grid-area:wan;}
+.cell-clients   {grid-area:clients;}
+.cell-mihomo    {grid-area:mihomo;}
+.cell-adguard   {grid-area:adguard;}
+.cell-wifi      {grid-area:wifi;}
+
+/* ============================================================ PANEL */
+.panel{
+  background:var(--surface);padding:5px 8px;
+  overflow:hidden;display:flex;flex-direction:column;gap:2px;position:relative;
+}
+.ptitle{
+  font-size:var(--text-xs);font-weight:700;color:var(--text-muted);
+  letter-spacing:.1em;text-transform:uppercase;
+  border-bottom:1px solid var(--border-2);padding-bottom:2px;margin-bottom:2px;
+  display:flex;justify-content:space-between;align-items:center;flex-shrink:0;
+}
+.ptitle-r{display:flex;gap:5px;align-items:center;}
+.ptitle a.ext{color:var(--text-faint);text-decoration:none;font-size:11px;line-height:1;font-weight:400;letter-spacing:0;text-transform:none;}
+.ptitle a.ext:hover{color:var(--cyan);}
+.badge{font-size:var(--text-xs);padding:1px 4px;border-radius:1px;font-weight:500;}
+.b-ok{background:var(--green-dim);color:var(--green);}
+.b-warn{background:var(--yellow-dim);color:var(--yellow);}
+.b-err{background:var(--red-dim);color:var(--red);}
+.b-cyan{background:var(--cyan-dim);color:var(--cyan);}
+
+/* ============================================================ METRIC */
+.met{display:flex;align-items:baseline;justify-content:space-between;gap:8px;font-size:var(--text-sm);line-height:1.3;}
+.ml{color:var(--text-muted);white-space:nowrap;flex-shrink:0;}
+.mv{color:var(--text);font-weight:500;text-align:right;font-variant-numeric:tabular-nums;}
+.mv.ok{color:var(--green);}.mv.warn{color:var(--yellow);}.mv.err{color:var(--red);}
+.mv.blue{color:var(--blue);}.mv.cyan{color:var(--cyan);}.mv.muted{color:var(--text-muted);}
+
+/* ============================================================ BAR */
+.bw{margin:1px 0;}
+.blr{display:flex;justify-content:space-between;font-size:var(--text-xs);color:var(--text-muted);margin-bottom:1px;}
+.blr .bv{color:var(--text);font-variant-numeric:tabular-nums;}
+.bar{height:4px;background:var(--surface-3);border-radius:1px;overflow:hidden;position:relative;}
+.bar-max{position:absolute;top:0;bottom:0;width:2px;background:rgba(255,255,255,0.18);border-radius:1px;pointer-events:none;transition:left .5s ease;}
+.corebar-max{position:absolute;left:0;right:0;height:2px;background:rgba(255,255,255,0.18);border-radius:1px;pointer-events:none;transition:bottom .5s ease;}
+.core-maxval{font-size:var(--text-xxs);color:var(--text-faint);font-variant-numeric:tabular-nums;}
+.bf{height:100%;border-radius:1px;transition:width 0.8s cubic-bezier(0.4,0,0.2,1),background-color 0.5s ease;background:var(--green);}
+.bf.warn{background:var(--yellow);}.bf.err{background:var(--red);}
+.bf.blue{background:var(--blue);}.bf.cyan{background:var(--cyan);}.bf.purple{background:var(--purple);}
+
+/* ============================================================ CPU CORES */
+.cores{display:grid;grid-template-columns:repeat(4,1fr);gap:2px;margin-top:2px;}
+.core{font-size:var(--text-xs);text-align:center;}
+.corebar{height:26px;background:var(--surface-3);border-radius:1px;position:relative;overflow:hidden;margin-bottom:1px;}
+.corefill{position:absolute;bottom:0;left:0;right:0;transition:height .8s ease;border-radius:1px;}
+.corelbel{color:var(--text-muted);}
+.coreval{font-variant-numeric:tabular-nums;}
+
+/* ============================================================ SERVICE */
+.svc{display:flex;align-items:center;gap:6px;font-size:var(--text-sm);padding:1px 0;}
+.svc-action{
+  background:none;border:none;padding:0 2px;cursor:pointer;color:var(--text-faint);
+  font-size:11px;line-height:1;flex-shrink:0;border-radius:2px;
+  transition:color .15s,background .15s;
+}
+.svc-action:hover{color:var(--cyan);background:var(--cyan-dim);}
+.svc-action:active{color:var(--green);}
+.svc-action.spinning{animation:spin .6s linear infinite;pointer-events:none;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.log-line{
+  font-size:9px;color:var(--text-muted);font-family:var(--font-mono);
+  line-height:1.3;word-break:break-all;margin-bottom:1px;
+}
+.dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
+.dot.ok{background:var(--green);box-shadow:0 0 4px var(--green);}
+.dot.err{background:var(--red);box-shadow:0 0 4px var(--red);}
+.dot.warn{background:var(--yellow);box-shadow:0 0 4px var(--yellow);}
+.sname{color:var(--text);flex:1;}
+.sstatus{font-size:var(--text-xs);}
+.sstatus.ok{color:var(--green);}.sstatus.err{color:var(--red);}
+
+/* ============================================================ VPN GROUP */
+.vgrp{padding:2px 0;border-bottom:1px solid var(--border);}
+.vgrp:last-child{border-bottom:none;}
+.vgh{display:flex;align-items:center;justify-content:space-between;font-size:var(--text-sm);margin-bottom:1px;}
+.vgname{color:var(--cyan);font-weight:500;font-size:var(--text-xs);}
+.vgtype{font-size:var(--text-xs);color:var(--text-faint);}
+.vgactive{font-size:var(--text-xs);color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.vgstats{display:flex;gap:8px;font-size:var(--text-xs);color:var(--text-muted);margin-top:1px;}
+.vst-ok{color:var(--green);}.vst-err{color:var(--red);}
+
+/* ============================================================ IFACE */
+.iface{padding:2px 0;border-bottom:1px solid var(--border);}
+.iface:last-child{border-bottom:none;}
+.ifr1{display:flex;align-items:baseline;justify-content:space-between;font-size:var(--text-sm);}
+.ifname{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.ifname.up{color:var(--green);}.ifname.down{color:var(--text-muted);}
+.ifspd{font-size:var(--text-xs);color:var(--cyan);margin-left:auto;margin-right:6px;}
+.iflink{font-size:var(--text-xs);color:var(--text-muted);}
+.ifr2{display:flex;gap:6px;font-size:var(--text-xs);font-variant-numeric:tabular-nums;}
+.ifr2 .rx{color:var(--cyan);}.ifr2 .tx{color:var(--orange);}
+.ifr2 .er{color:var(--red);}
+.ifr2 span{color:var(--text-muted);}
+/* Dynamic traffic color helpers — applied via JS */
+.rx-dim{color:var(--text-faint)!important;}
+.rx-lo{color:#1e6e65!important;}
+.rx-mid{color:var(--cyan)!important;}
+.rx-hi{color:#50e8d6!important;text-shadow:0 0 8px rgba(53,196,180,.7);}
+.tx-dim{color:var(--text-faint)!important;}
+.tx-lo{color:#7a4a18!important;}
+.tx-mid{color:var(--orange)!important;}
+.tx-hi{color:#f0a855!important;text-shadow:0 0 8px rgba(216,136,56,.7);}
+
+/* ============================================================ PING */
+.pbar{flex:2;height:4px;background:var(--surface-3);border-radius:1px;overflow:hidden;}
+.pbf{height:100%;border-radius:1px;transition:width .8s ease;}
+.pval{font-variant-numeric:tabular-nums;width:42px;text-align:right;font-size:var(--text-xs);}
+.pval.ok{color:var(--green);}.pval.warn{color:var(--yellow);}.pval.err{color:var(--red);}.pval.cyan{color:var(--cyan);}
+
+/* ============================================================ DNS row */
+.ds{display:flex;align-items:baseline;justify-content:space-between;font-size:var(--text-xs);gap:6px;padding:1px 0;}
+.ds .dl{color:var(--text-muted);}.ds .dv{color:var(--text);font-variant-numeric:tabular-nums;}
+.ds .dv.ok{color:var(--green);}.ds .dv.warn{color:var(--yellow);}
+
+/* ============================================================ CLIENTS */
+.client-row{
+  display:flex;align-items:center;gap:4px;
+  padding:2px 0;border-bottom:1px solid var(--border);
+  font-size:var(--text-xs);
+}
+.client-row:last-child{border-bottom:none;}
+.cicon{width:13px;text-align:center;flex-shrink:0;font-style:normal;}
+.cicon.w5{color:var(--cyan);}
+.cicon.w24{color:var(--yellow);}
+.cicon.eth{color:var(--blue);}
+.cname{flex:1;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.cip{color:var(--text-muted);font-variant-numeric:tabular-nums;white-space:nowrap;margin-left:auto;padding-left:3px;}
+.cspd{color:var(--text-faint);font-size:var(--text-xxs);white-space:nowrap;padding-left:3px;}
+
+/* ============================================================ WIFI AP */
+.wifi-section{padding:2px 0;border-bottom:1px solid var(--border);}
+.wifi-section:last-child{border-bottom:none;}
+.wifi-sh{display:flex;align-items:center;justify-content:space-between;margin-bottom:2px;}
+.wifi-sname{color:var(--cyan);font-size:var(--text-xs);font-weight:500;}
+.wrow{display:flex;justify-content:space-between;gap:4px;font-size:var(--text-xs);}
+.wlabel{color:var(--text-muted);}
+.wval{color:var(--text);font-variant-numeric:tabular-nums;}
+.wlink{color:var(--text-faint);text-decoration:none;font-size:var(--text-xxs);}
+.wlink:hover{color:var(--cyan);}
+
+/* ============================================================ SHARED */
+hr{border:none;border-top:1px solid var(--border);margin:2px 0;}
+.si{flex:1;overflow-y:auto;overflow-x:hidden;scrollbar-width:none;min-height:0;}
+.si::-webkit-scrollbar{display:none;}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.live{display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--green);animation:blink 2s infinite;vertical-align:middle;margin-left:3px;}
+.footer{position:fixed;bottom:0;right:4px;font-size:var(--text-xxs);color:var(--text-faint);z-index:10;}
+.footer a{color:var(--text-faint);text-decoration:none;}
+
+/* ============================================================
+   TABLETS (iPad portrait, small laptops)  769px - 1024px
+   ============================================================ */
+@media (max-width: 1024px) and (min-width: 769px) {
+  .grid {
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto;
+    grid-auto-rows: minmax(200px, auto);
+    grid-template-areas:
+      "cpu      memory"
+      "storage  services"
+      "ifaces   latency"
+      "wan      clients"
+      "mihomo   adguard"
+      "wifi     wifi";
+  }
+  .panel { min-height: 200px; }
+}
+
+/* ============================================================
+   MOBILE  ≤ 768px  → 3 col x 4 row, full scroll
+   Row 1: cpu | memory | storage
+   Row 2: ifaces | latency | wan
+   Row 3: clients | mihomo | adguard
+   Row 4: services(span 2) | wifi
+   ============================================================ */
+@media (max-width:768px){
+  html,body{height:auto;overflow:auto;}
+  .dash{height:auto;overflow:visible;}
+  .topbar{
+    height:auto;flex-direction:column;align-items:flex-start;
+    padding:4px 8px;gap:3px;
+  }
+  .tb-l,.tb-r{flex-wrap:wrap;gap:5px;font-size:var(--text-xxs);}
+  .tb-r{margin-left:auto;justify-content:flex-end;}
+  .tb-links{margin-left:0;flex-wrap:wrap;}
+  .grid{
+    flex:none;height:auto;
+    grid-template-columns:1fr 1fr 1fr;
+    grid-template-rows:none;
+    grid-auto-rows:minmax(170px,auto);
+    grid-template-areas:
+      "cpu     memory   storage"
+      "ifaces  latency  wan"
+      "clients mihomo   adguard"
+      "services services wifi";
+    gap:1px;
+  }
+  .panel{min-height:170px;}
+  .si{max-height:220px;}
+  .footer{position:static;text-align:center;padding:4px;display:block;}
+}
+
+/* ============================================================
+   PHONE  ≤ 480px  → 2 col x 8 rows
+   ============================================================ */
+@media (max-width:480px){
+  .grid{
+    grid-template-columns:1fr 1fr;
+    grid-auto-rows:minmax(150px,auto);
+    grid-template-areas:
+      "cpu     memory"
+      "storage storage"
+      "ifaces  ifaces"
+      "latency wan"
+      "clients clients"
+      "mihomo  adguard"
+      "services services"
+      "wifi    wifi";
+  }
+  .panel{min-height:150px;}
+}
+/* ============================================================
+   ULTRAWIDE / 4K MONITORS
+   ============================================================ */
+@media (min-width: 1920px) {
+  body {
+    display: flex;
+    justify-content: center;
+    background: #000;
+  }
+  .dash {
+    max-width: 1600px;
+    width: 100%;
+    border-left: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+    box-shadow: 0 0 50px rgba(0,0,0,0.5);
+  }
+}
+
+/* demo-only overrides */
+.corefill{position:absolute;bottom:0;left:0;right:0;border-radius:1px;}
+.coreval{font-size:var(--text-xs);color:var(--green);text-align:right;min-width:36px;}
+.corelbel{font-size:var(--text-xs);color:var(--text-muted);}
+.core-maxval{font-size:9px;color:var(--text-faint);}
+.core{display:grid;grid-template-columns:1fr auto auto;grid-template-rows:auto auto;gap:0 4px;align-items:center;}
+.core .corebar{grid-column:1/-1;grid-row:1;}
+.core .corelbel{grid-row:2;grid-column:1;}
+.core .coreval{grid-row:2;grid-column:2;}
+.core .core-maxval{grid-row:2;grid-column:3;}
+.iface{margin-bottom:3px;}
+.iname{color:var(--cyan);font-size:var(--text-xs);}
+.istat{font-size:var(--text-xs);color:var(--text-muted);}
+.ispeed{font-size:var(--text-xs);}
+.rx-val{color:var(--green);}
+.tx-val{color:var(--yellow);}
+.lat-row{display:flex;align-items:center;gap:4px;margin-bottom:4px;}
+.lat-label{font-size:var(--text-xs);color:var(--text-muted);min-width:80px;}
+.lat-bar-wrap{flex:1;height:6px;background:var(--surface-3);border-radius:1px;overflow:hidden;position:relative;}
+.lat-bar{height:100%;border-radius:1px;}
+.lat-val{font-size:var(--text-xs);min-width:38px;text-align:right;}
+.lat-group{margin-bottom:8px;}
+.lat-gh{font-size:var(--text-xs);color:var(--text-faint);margin-bottom:3px;letter-spacing:.04em;}
+.vgrp{margin-bottom:8px;padding:4px 6px;background:var(--surface-2);border-radius:2px;}
+.vgh{display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;}
+.vgname{font-size:var(--text-xs);color:var(--cyan);}
+.vgtype{font-size:9px;}
+.vgactive{font-size:var(--text-xs);color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.vgcnt{font-size:9px;color:var(--text-faint);margin-top:1px;}
+.client-row{display:flex;align-items:center;gap:5px;padding:1px 0;font-size:var(--text-xs);}
+.cli-icon{flex-shrink:0;width:14px;text-align:center;}
+.cli-name{color:var(--text);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.cli-ip{color:var(--text-faint);min-width:28px;}
+.cli-type{font-size:9px;color:var(--text-muted);}
+.wrow{display:flex;justify-content:space-between;font-size:var(--text-xs);padding:1px 0;}
+.wlabel{color:var(--text-muted);}
+.wval{color:var(--text);}
+.wlink{color:var(--cyan);text-decoration:none;}
+.wifi-sh{font-size:var(--text-xs);color:var(--cyan);margin:4px 0 2px;font-weight:600;}
+.wifi-section{margin-bottom:4px;}
+.adg-stat{display:flex;justify-content:space-between;font-size:var(--text-xs);padding:1px 0;}
+.adg-label{color:var(--text-muted);}
+.adg-val{color:var(--text);}
+.adg-blocked-row{display:flex;justify-content:space-between;font-size:9px;color:var(--text-faint);padding:1px 0;}
+.stor-row{display:flex;justify-content:space-between;font-size:var(--text-xs);align-items:center;margin-bottom:3px;}
+.stor-mount{color:var(--cyan);min-width:50px;}
+.stor-bar-wrap{flex:1;margin:0 6px;height:5px;background:var(--surface-3);border-radius:1px;overflow:hidden;}
+.stor-bar{height:100%;border-radius:1px;}
+.stor-used{color:var(--text-muted);font-size:9px;}
+.nvme-badge{display:inline-block;font-size:9px;padding:1px 5px;border-radius:1px;background:var(--surface-3);color:var(--cyan);margin-top:4px;}
+@keyframes pulse-demo{0%,100%{opacity:1}50%{opacity:.5}}
+</style>
+</head>
+<body>
+<div class="dash">
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="tb-l">
+    <span class="tb-title">OPENWRT N100</span>
+    <span class="tb-sep">|</span>
+    <span id="tb-host" style="color:var(--text-muted)">topton-n100</span>
+    <span class="tb-sep">|</span>
+    <span style="color:var(--yellow);font-weight:700;letter-spacing:.05em;animation:pulse-demo 2s ease-in-out infinite">◈ DEMO</span>
+    <span class="tb-sep">|</span>
+    <span style="color:var(--text-muted)">kernel 6.12.38</span>
+    <span class="tb-sep">|</span>
+    <span style="color:var(--text-muted)">OpenWrt 25.12 r29674</span>
+    <span class="tb-links">
+      <a class="tb-link" href="#" target="_blank">LuCI</a>
+      <a class="tb-link" href="#" target="_blank">Metacubexd</a>
+      <a class="tb-link" href="#" target="_blank">AdGuard</a>
+      <a class="tb-link" href="#" target="_blank">WiFi AP</a>
+    </span>
+  </div>
+  <div class="tb-r">
+    <span style="color:var(--text-muted)">42°C</span>
+    <span class="tb-sep">|</span>
+    <span class="tb-uptime">uptime 3d 14:27:03</span>
+    <span class="tb-sep">|</span>
+    <span style="color:var(--text-muted)">WAN ↑1.2M ↓344K/s</span>
+    <span class="tb-sep">|</span>
+    <span class="tb-clock">09:29:38</span>
+  </div>
+</div>
+
+<!-- MAIN GRID -->
+<div class="grid">
+
+  <!-- CPU -->
+  <div class="panel cell-cpu">
+    <div class="ptitle">CPU <span class="badge b-ok">16%</span></div>
+    <div class="cores" id="cpu-cores" style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px 6px;">
+      <div class="core"><div class="corebar"><div class="corefill" style="height:12%;background:var(--green)"></div><div class="corebar-max" style="bottom:24%"></div></div><div class="corelbel">C0</div><div class="coreval">12%</div><div class="core-maxval">24%</div></div>
+      <div class="core"><div class="corebar"><div class="corefill" style="height:8%;background:var(--green)"></div><div class="corebar-max" style="bottom:20%"></div></div><div class="corelbel">C1</div><div class="coreval">8%</div><div class="core-maxval">20%</div></div>
+      <div class="core"><div class="corebar"><div class="corefill" style="height:22%;background:var(--green)"></div><div class="corebar-max" style="bottom:35%"></div></div><div class="corelbel">C2</div><div class="coreval">22%</div><div class="core-maxval">35%</div></div>
+      <div class="core"><div class="corebar"><div class="corefill" style="height:5%;background:var(--green)"></div><div class="corebar-max" style="bottom:12%"></div></div><div class="corelbel">C3</div><div class="coreval">5%</div><div class="core-maxval">12%</div></div>
+    </div>
+    <hr>
+    <div class="met"><span class="ml">load 1m</span><span class="mv">0.42</span></div>
+    <div class="met"><span class="ml">load 5m</span><span class="mv">0.35</span></div>
+    <div class="met"><span class="ml">load 15m</span><span class="mv">0.28</span></div>
+    <hr>
+    <div class="met"><span class="ml">active conns</span><span class="mv" style="color:var(--cyan)">1,247</span></div>
+    <div class="met"><span class="ml">ct max</span><span class="mv">65,536</span></div>
+    <hr>
+    <div class="met"><span class="ml">nft tables</span><span class="mv">4</span></div>
+  </div>
+
+  <!-- MEMORY -->
+  <div class="panel cell-memory">
+    <div class="ptitle">MEMORY</div>
+    <div class="met"><span class="ml">RAM used</span><span class="mv">1,820 MB / 7,624 MB</span></div>
+    <div style="height:8px;background:var(--surface-3);border-radius:1px;margin:2px 0 5px;overflow:hidden;position:relative">
+      <div style="position:absolute;left:0;top:0;bottom:0;width:24%;background:var(--green);border-radius:1px"></div>
+      <div style="position:absolute;left:24%;top:0;bottom:0;width:1%;background:rgba(255,255,255,.18);border-radius:1px"></div>
+    </div>
+    <div class="met"><span class="ml">buffers</span><span class="mv">48 MB</span></div>
+    <div style="height:4px;background:var(--surface-3);border-radius:1px;margin:2px 0 5px;overflow:hidden">
+      <div style="width:1%;height:100%;background:var(--cyan);border-radius:1px"></div>
+    </div>
+    <div class="met"><span class="ml">cached</span><span class="mv">1,340 MB</span></div>
+    <div style="height:4px;background:var(--surface-3);border-radius:1px;margin:2px 0 8px;overflow:hidden;position:relative">
+      <div style="position:absolute;left:0;top:0;bottom:0;width:18%;background:var(--cyan);opacity:.7;border-radius:1px"></div>
+      <div style="position:absolute;left:18%;top:0;bottom:0;width:2px;background:rgba(255,255,255,.18)"></div>
+    </div>
+    <div class="met"><span class="ml">SWAP</span><span class="mv">none</span></div>
+    <hr>
+    <div class="met"><span class="ml">free</span><span class="mv" style="color:var(--green)">5,884 MB</span></div>
+    <div class="met"><span class="ml">available</span><span class="mv" style="color:var(--green)">6,120 MB</span></div>
+  </div>
+
+  <!-- STORAGE -->
+  <div class="panel cell-storage">
+    <div class="ptitle">STORAGE</div>
+    <div class="stor-row">
+      <span class="stor-mount">/boot</span>
+      <div class="stor-bar-wrap"><div class="stor-bar" style="width:3%;background:var(--green)"></div></div>
+      <span class="stor-used">4.2G / 128M</span>
+    </div>
+    <div class="stor-row">
+      <span class="stor-mount">/root</span>
+      <div class="stor-bar-wrap"><div class="stor-bar" style="width:9%;background:var(--green)"></div></div>
+      <span class="stor-used">22.4G / 228G</span>
+    </div>
+    <hr>
+    <div>
+      <span class="nvme-badge">NVMe 36°C</span>
+      <span style="font-size:9px;color:var(--text-faint);margin-left:5px">WD Blue SN570</span>
+    </div>
+  </div>
+
+  <!-- SERVICES -->
+  <div class="panel cell-services">
+    <div class="ptitle">SERVICES <span style="font-size:9px;color:var(--text-faint);font-weight:400">↑ UP</span></div>
+    <div id="svc-p">
+      <div class="svc"><button class="svc-action">&#8635;</button><button class="svc-action">&#9776;</button><div class="dot ok"></div><span class="sname">mihomo/nikki</span><span class="sstatus ok">UP</span></div>
+      <div class="svc"><button class="svc-action">&#8635;</button><button class="svc-action">&#9776;</button><div class="dot ok"></div><span class="sname">AdGuard Home</span><span class="sstatus ok">UP</span></div>
+      <div class="svc"><button class="svc-action">&#8635;</button><button class="svc-action">&#9776;</button><div class="dot ok"></div><span class="sname">SSH</span><span class="sstatus ok">UP</span></div>
+      <div class="svc"><button class="svc-action">&#8635;</button><button class="svc-action">&#9776;</button><div class="dot ok"></div><span class="sname">LuCI (uhttpd)</span><span class="sstatus ok">UP</span></div>
+      <div class="svc"><button class="svc-action">&#8635;</button><button class="svc-action">&#9776;</button><div class="dot ok"></div><span class="sname">network</span><span class="sstatus ok">UP</span></div>
+      <div class="svc"><button class="svc-action">&#8635;</button><button class="svc-action">&#9776;</button><div class="dot ok"></div><span class="sname">dnsmasq</span><span class="sstatus ok">UP</span></div>
+      <div class="svc"><button class="svc-action">&#8635;</button><button class="svc-action">&#9776;</button><div class="dot ok"></div><span class="sname">ntpd</span><span class="sstatus ok">UP</span></div>
+      <div class="svc"><button class="svc-action">&#8635;</button><button class="svc-action">&#9776;</button><div class="dot ok"></div><span class="sname">crond</span><span class="sstatus ok">UP</span></div>
+      <div class="svc"><button class="svc-action">&#8635;</button><button class="svc-action">&#9776;</button><div class="dot err"></div><span class="sname">mwan3</span><span class="sstatus err">DOWN</span></div>
+      <div class="svc"><button class="svc-action">&#8635;</button><button class="svc-action">&#9776;</button><div class="dot ok"></div><span class="sname">rpcd</span><span class="sstatus ok">UP</span></div>
+      <div class="svc"><button class="svc-action">&#8635;</button><button class="svc-action">&#9776;</button><div class="dot ok"></div><span class="sname">opentracker</span><span class="sstatus ok">UP</span></div>
+      <hr>
+      <div class="svc"><button class="svc-action">&#8635;</button><button class="svc-action">&#9776;</button><div class="dot warn"></div><span class="sname">firewall</span><span class="sstatus" style="color:var(--yellow)">LOADED</span></div>
+      <div class="svc"><button class="svc-action">&#8635;</button><button class="svc-action">&#9776;</button><div class="dot warn"></div><span class="sname">SQM/CAKE</span><span class="sstatus" style="color:var(--yellow)">LOADED</span></div>
+    </div>
+  </div>
+
+  <!-- INTERFACES -->
+  <div class="panel cell-interfaces">
+    <div class="ptitle">INTERFACES <span style="font-size:9px;color:var(--text-faint)">CT: 1,247</span></div>
+    <div>
+      <div class="met"><span class="iname">br-lan</span> <span class="badge b-ok" style="font-size:9px">UP</span></div>
+      <div class="met" style="font-size:var(--text-xs);color:var(--text-muted)">↑ 340K <span style="color:var(--text-faint)">e:0</span> &nbsp; ↓ 1.2M <span style="color:var(--text-faint)">e:0</span></div>
+      <div class="met"><span class="iname">eth0</span> <span class="badge b-ok" style="font-size:9px">1G UP</span></div>
+      <div class="met" style="font-size:var(--text-xs)"><span style="color:var(--green)">↑ 82K</span> <span style="color:var(--text-faint)">420K e:0</span></div>
+      <div class="met"><span class="iname">eth1</span> <span class="badge b-ok" style="font-size:9px">1G UP</span></div>
+      <div class="met" style="font-size:var(--text-xs)"><span style="color:var(--green)">↑ 15K</span> <span style="color:var(--text-faint)">92K e:0</span></div>
+      <div class="met"><span class="iname">eth2</span> <span class="badge b-ok" style="font-size:9px">1G UP</span></div>
+      <div class="met" style="font-size:var(--text-xs)"><span style="color:var(--text-faint)">-- e:0</span></div>
+      <div class="met"><span class="iname">eth3</span> <span style="font-size:9px;color:var(--red)">DOWN</span></div>
+      <div class="met"><span class="iname">eth4</span> <span style="font-size:9px;color:var(--red)">DOWN</span></div>
+      <div class="met"><span class="iname">eth5</span> <span style="font-size:9px;color:var(--red)">DOWN</span></div>
+      <div class="met"><span class="iname">pppoe-wan</span> <span class="badge b-ok" style="font-size:9px">UP</span></div>
+      <div class="met" style="font-size:var(--text-xs)"><span style="color:var(--green)">↑ 1.2M</span> <span style="color:var(--text-faint)">340K e:0</span></div>
+    </div>
+  </div>
+
+  <!-- LATENCY -->
+  <div class="panel cell-latency">
+    <div class="ptitle">LATENCY</div>
+    <div class="met" style="margin-bottom:6px"><span class="ml">last check</span><span class="mv" style="color:var(--text-faint)">22:05:12</span></div>
+
+    <div class="lat-group">
+      <div class="lat-gh">DIRECT (ISP)</div>
+      <div class="lat-row"><span class="lat-label">cf</span><div class="lat-bar-wrap"><div class="lat-bar" style="width:20%;background:var(--cyan)"></div></div><span class="lat-val" style="color:var(--cyan)">24ms</span></div>
+      <div class="lat-row"><span class="lat-label">ggl</span><div class="lat-bar-wrap"><div class="lat-bar" style="width:30%;background:var(--green)"></div></div><span class="lat-val" style="color:var(--green)">36ms</span></div>
+      <div class="lat-row"><span class="lat-label">ya</span><div class="lat-bar-wrap"><div class="lat-bar" style="width:15%;background:var(--cyan)"></div></div><span class="lat-val" style="color:var(--cyan)">18ms</span></div>
+    </div>
+
+    <div class="lat-group">
+      <div class="lat-gh">AUTO-FOREIGN</div>
+      <div class="lat-row"><span class="lat-label">cf</span><div class="lat-bar-wrap"><div class="lat-bar" style="width:60%;background:var(--green)"></div></div><span class="lat-val" style="color:var(--green)">120ms</span></div>
+      <div class="lat-row"><span class="lat-label">ggl</span><div class="lat-bar-wrap"><div class="lat-bar" style="width:71%;background:var(--green)"></div></div><span class="lat-val" style="color:var(--green)">142ms</span></div>
+      <div class="lat-row"><span class="lat-label">ya</span><div class="lat-bar-wrap"><div class="lat-bar" style="width:100%;background:var(--red)"></div></div><span class="lat-val" style="color:var(--red)">FAIL</span></div>
+    </div>
+
+    <div class="lat-group">
+      <div class="lat-gh">CASCADE-AI (WARP)</div>
+      <div class="lat-row"><span class="lat-label">cf</span><div class="lat-bar-wrap"><div class="lat-bar" style="width:41%;background:var(--green)"></div></div><span class="lat-val" style="color:var(--green)">82ms</span></div>
+      <div class="lat-row"><span class="lat-label">ggl</span><div class="lat-bar-wrap"><div class="lat-bar" style="width:46%;background:var(--green)"></div></div><span class="lat-val" style="color:var(--green)">92ms</span></div>
+      <div class="lat-row"><span class="lat-label">ya</span><div class="lat-bar-wrap"><div class="lat-bar" style="width:100%;background:var(--red)"></div></div><span class="lat-val" style="color:var(--red)">FAIL</span></div>
+    </div>
+
+    <div class="lat-group">
+      <div class="lat-gh">PAYPAL-POOL</div>
+      <div class="lat-row"><span class="lat-label">cf</span><div class="lat-bar-wrap"><div class="lat-bar" style="width:74%;background:var(--yellow)"></div></div><span class="lat-val" style="color:var(--yellow)">148ms</span></div>
+      <div class="lat-row"><span class="lat-label">ggl</span><div class="lat-bar-wrap"><div class="lat-bar" style="width:85%;background:var(--yellow)"></div></div><span class="lat-val" style="color:var(--yellow)">170ms</span></div>
+      <div class="lat-row"><span class="lat-label">ya</span><div class="lat-bar-wrap"><div class="lat-bar" style="width:100%;background:var(--red)"></div></div><span class="lat-val" style="color:var(--red)">FAIL</span></div>
+    </div>
+  </div>
+
+  <!-- WAN -->
+  <div class="panel cell-wan">
+    <div class="ptitle">WAN</div>
+    <div class="met"><span class="ml">WAN IP</span><span class="mv" style="color:var(--cyan)">95.101.xx.xx</span></div>
+    <div class="met"><span class="ml">gateway</span><span class="mv">10.90.0.1</span></div>
+    <div class="met"><span class="ml">proto</span><span class="mv">pppoe</span></div>
+    <div class="met"><span class="ml">WAN uptime</span><span class="mv" style="color:var(--green)">3d 14:27:03</span></div>
+    <hr>
+    <div class="met"><span class="ml">DNS (ISP)</span><span class="mv" style="color:var(--text-faint)">213.177.96.1, 213.177.97.1</span></div>
+  </div>
+
+  <!-- CLIENTS -->
+  <div class="panel cell-clients">
+    <div class="ptitle">CLIENTS <span class="badge b-ok">6</span></div>
+    <div>
+      <div class="client-row"><span class="cli-icon" style="color:var(--text-muted)">▫</span><span class="cli-name">desktop-pc1</span><span class="cli-ip">.2</span><span class="cli-type">2.5G wire</span></div>
+      <div class="client-row"><span class="cli-icon" style="color:var(--text-muted)">▫</span><span class="cli-name">desktop-pc2</span><span class="cli-ip">.3</span><span class="cli-type">2.5G wire</span></div>
+      <div class="client-row"><span class="cli-icon" style="color:var(--text-muted)">📺</span><span class="cli-name">samsung-tv</span><span class="cli-ip">.4</span><span class="cli-type">100M wire</span></div>
+      <div class="client-row"><span class="cli-icon" style="color:var(--cyan)">⊙</span><span class="cli-name">Galaxy-S24</span><span class="cli-ip">.11</span><span class="cli-type">5GHz</span></div>
+      <div class="client-row"><span class="cli-icon" style="color:var(--cyan)">⊙</span><span class="cli-name">Galaxy-S23U</span><span class="cli-ip">.12</span><span class="cli-type">5GHz</span></div>
+      <div class="client-row"><span class="cli-icon" style="color:var(--text-muted)">○</span><span class="cli-name">macbook-air</span><span class="cli-ip">.5</span><span class="cli-type">2.4GHz</span></div>
+    </div>
+  </div>
+
+  <!-- MIHOMO PROXY -->
+  <div class="panel cell-mihomo">
+    <div class="ptitle">MIHOMO PROXY <span class="badge b-ok">--</span>
+      <div class="ptitle-r"><a class="ext" href="#" target="_blank">↗</a></div>
+    </div>
+    <div>
+      <div class="vgrp">
+        <div class="vgh"><span class="vgname">AUTO-FOREIGN-POOL</span><span class="vgtype" style="color:var(--cyan)">url-test</span></div>
+        <div class="vgactive">▶ DE-vless-1</div>
+        <div class="vgcnt" style="color:var(--text-faint)">✓ 6 ✗ 2 / 8</div>
+      </div>
+      <div class="vgrp">
+        <div class="vgh"><span class="vgname">PAYPAL-POOL</span><span class="vgtype" style="color:var(--cyan)">url-test</span></div>
+        <div class="vgactive">▶ US-vless-2</div>
+        <div class="vgcnt" style="color:var(--text-faint)">✓ 3 ✗ 1 / 4</div>
+      </div>
+      <div class="vgrp">
+        <div class="vgh"><span class="vgname">CASCADE-AI</span><span class="vgtype" style="color:var(--yellow)">fallback</span></div>
+        <div class="vgactive">▶ warp-out</div>
+        <div class="vgcnt" style="color:var(--text-faint)">✓ 2 ✗ 0 / 2</div>
+      </div>
+      <div class="vgrp">
+        <div class="vgh"><span class="vgname">MANUAL-SELECT</span><span class="vgtype" style="color:var(--purple)">select</span></div>
+        <div class="vgactive">▶ AUTO-FOREIGN-POOL</div>
+        <div class="vgcnt" style="color:var(--text-faint)">✓ 8 ✗ 2 / 10</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DNS / ADGUARD -->
+  <div class="panel cell-adguard">
+    <div class="ptitle">DNS / ADGUARD HOME <span class="badge b-ok">UP</span>
+      <div class="ptitle-r"><a class="ext" href="#" target="_blank">↗</a></div>
+    </div>
+    <div>
+      <div class="adg-stat"><span class="adg-label">queries today</span><span class="adg-val">28,412</span></div>
+      <div class="adg-stat"><span class="adg-label">blocked</span><span class="adg-val" style="color:var(--yellow)">4,238 (14.9%)</span></div>
+      <div class="adg-stat"><span class="adg-label">avg latency</span><span class="adg-val">2.4ms</span></div>
+      <hr>
+      <div class="adg-blocked-row"><span>graph.facebook.com</span><span>842</span></div>
+      <div class="adg-blocked-row"><span>analytics.tiktok.com</span><span>631</span></div>
+      <div class="adg-blocked-row"><span>telemetry.microsoft.com</span><span>418</span></div>
+      <hr>
+      <div class="adg-stat"><span class="adg-label">filtering</span><span class="adg-val" style="color:var(--green)">ON</span></div>
+      <div class="adg-stat"><span class="adg-label">upstream DNS</span><span class="adg-val">127.0.0.1:1053</span></div>
+    </div>
+  </div>
+
+  <!-- WIFI AP -->
+  <div class="panel cell-wifi">
+    <div class="ptitle">WIFI AP <span class="badge b-ok">ONLINE</span></div>
+    <div>
+      <div class="wrow"><span class="wlabel">model</span><span class="wval">ASUS AX88U-Pro</span></div>
+      <div class="wrow"><span class="wlabel">mode</span><span class="wval">AP mode</span></div>
+      <div class="wrow"><span class="wlabel">admin</span><a class="wlink" href="#" target="_blank">:8443 ↗</a></div>
+      <hr>
+      <div class="wifi-section">
+        <div class="wifi-sh">2.4 GHz</div>
+        <div class="wrow"><span class="wlabel">std</span><span class="wval">802.11ax (Wi-Fi 6)</span></div>
+        <div class="wrow"><span class="wlabel">band</span><span class="wval">2400–2483 MHz</span></div>
+      </div>
+      <div class="wifi-section">
+        <div class="wifi-sh">5 GHz</div>
+        <div class="wrow"><span class="wlabel">std</span><span class="wval">802.11ax (Wi-Fi 6)</span></div>
+        <div class="wrow"><span class="wlabel">band</span><span class="wval">5180–5825 MHz</span></div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /grid -->
+</div><!-- /dash -->
+</body>
+</html>
