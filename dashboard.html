@@ -229,7 +229,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
   font-size:var(--text-xs);
 }
 .client-row:last-child{border-bottom:none;}
-.cicon{width:13px;text-align:center;flex-shrink:0;font-style:normal;}
+.cicon{width:30px;text-align:left;flex-shrink:0;font-style:normal;font-size:var(--text-xxs);font-weight:700;}
 .cicon.w5{color:var(--cyan);}
 .cicon.w24{color:var(--yellow);}
 .cicon.eth{color:var(--blue);}
@@ -506,14 +506,14 @@ const C = {
   mihomo_api:    'http://192.168.1.1:9090',
   mihomo_secret: '',                     // mihomo/nikki external-controller secret
   adguard_host:  '192.168.1.1',
-  adguard_port:  3030,
+  adguard_port:  3003,                  // AdGuardHome port (check /etc/adguardhome/adguardhome.yaml)
   adguard_user:  'admin',
   adguard_pass:  '',
   wifi_ap:        '',                    // External WiFi AP IP (leave empty to use local wireless)
-  wifi_ap_port:   '',                    // AP admin port, e.g. 8443 for HTTPS or 80/443. Leave empty to hide link
+  wifi_ap_port:   80,                    // ASUS uses port 80 for HTTP admin
   wifi_ap_user:   'admin',               // AP admin username (for ASUS client list API)
   wifi_ap_pass:   '',                     // AP admin password
-  wifi_ap_https:  true,                  // true = HTTPS, false = HTTP for AP admin
+  wifi_ap_https:  false,                 // ASUS AX88U-Pro uses plain HTTP
   fast:   2000,
   slow:   8000,
   vpn:    5000,
@@ -673,7 +673,7 @@ async function update_board(){
 }
 
 // ===== CPU =====
-let cpuMethod='unknown';
+let cpuMethod='procstat'; // forced: always use /proc/stat for per-core accuracy
 async function update_cpu(){
   if(cpuMethod==='unknown'||cpuMethod==='realtime'){
     try{
@@ -705,6 +705,9 @@ async function update_cpu(){
       if(raw&&raw.startsWith('cpu')){
         cpuMethod='procstat';
         const lines=raw.split('\n').filter(l=>l.startsWith('cpu'));
+        // Auto-heal: rebuild DOM if core count doesn't match reality
+        const actualCores=lines.filter(l=>/^cpu\d+\s/.test(l)).length;
+        if(actualCores>0&&actualCores!==numCores){numCores=actualCores;build_cores(actualCores);}
         const parse=l=>{const p=l.trim().split(/\s+/).slice(1).map(Number);const[u,n,s,id,io,irq,si]=p;return{idle:id,total:u+n+s+id+(io||0)+(irq||0)+(si||0)};};
         const curr=lines.map(parse);
         if(!pCPU){pCPU=curr;return;}
@@ -1317,9 +1320,12 @@ async function update_adguard(){
     if(status){
       if(html && !html.endsWith('<hr>')) html+='<hr>';
       html+=`<div class="ds"><span class="dl">filtering</span><span class="dv ${status.protection_enabled?'ok':'err'}">${status.protection_enabled?'ON':'OFF'}</span></div>`;
-      if(status.dns_addresses?.length){
-        html+=`<div class="ds"><span class="dl">upstream DNS</span><span class="dv" style="color:var(--text-muted)">${status.dns_addresses[0]}:${status.dns_port||53}</span></div>`;
-      }
+    }
+    // upstream_dns from /control/config (correct field — not dns_addresses which is the bind addr)
+    const upstreams=(await agh_api('/control/config'))?.upstream_dns;
+    if(upstreams?.length){
+      if(html&&!html.endsWith('<hr>')) html+='<hr>';
+      html+=`<div class="ds"><span class="dl">upstream DNS</span><span class="dv" style="color:var(--text-muted)">${upstreams[0]}</span></div>`;
     }
     const bdg=$('agh-bdg');
     if(stats||status){
@@ -1390,25 +1396,37 @@ async function update_clients(){
     }
   }catch(e){}
 
-  // --- Band detection 2: ASUS AP appGet.cgi ---
+  // --- Band detection 2: ASUS AP via cookie auth (Merlin/stock) ---
+  // ASUS routers don't support HTTP Basic Auth; requires cookie-based login.
   const asusMap={};
-  if(C.wifi_ap){
+  if(C.wifi_ap&&C.wifi_ap_pass){
     try{
       const proto=C.wifi_ap_https?'https':'http';
       const port=C.wifi_ap_port||80;
-      const b64=btoa((C.wifi_ap_user||'admin')+':'+(C.wifi_ap_pass||''));
-      const r=await file_exec('/usr/bin/curl',[
-        '-s','-m','5','-k',
-        '-H','Authorization: Basic '+b64,
-        proto+'://'+C.wifi_ap+':'+port+'/appGet.cgi?hook=get_clientlist()'
+      const base=proto+'://'+C.wifi_ap+':'+port;
+      const b64=btoa((C.wifi_ap_user||'admin')+':'+C.wifi_ap_pass);
+      // Step 1: POST login to get asus_token session cookie
+      await file_exec('/usr/bin/curl',[
+        '-s','-m','5','-k','-c','/tmp/.asus_tok',
+        '-X','POST',
+        '-H','Content-Type: application/x-www-form-urlencoded',
+        '-d','login_authorization='+b64,
+        base+'/login.cgi'
       ]);
-      if(r?.code===0&&r.stdout){
-        const m=r.stdout.match(/get_clientlist\s*=\s*(\{[\s\S]*\})/);
+      // Step 2: GET clientlist using session cookie
+      const r=await file_exec('/usr/bin/curl',[
+        '-s','-m','5','-k','-b','/tmp/.asus_tok',
+        base+'/appGet.cgi?hook=get_clientlist()'
+      ]);
+      if(r?.code===0&&r.stdout&&!r.stdout.includes('Main_Login')){
+        // ASUS returns: get_clientlist = {...} or raw JSON
+        const m=r.stdout.match(/get_clientlist\s*=\s*(\{[\s\S]*?\})\s*;?\s*$/)
+               ||r.stdout.match(/^(\{[\s\S]+\})$/m);
         if(m){
           const cl=JSON.parse(m[1]);
           for(const[mac,info] of Object.entries(cl)){
-            if(typeof info==='object'&&info.from)
-              asusMap[mac.toLowerCase()]={band:info.from,rssi:info.rssi||null};
+            if(mac==='maclist'||typeof info!=='object'||!info.from) continue;
+            asusMap[mac.toLowerCase()]={band:info.from,rssi:info.rssi||null,name:info.nickName||info.name||null};
           }
         }
       }
@@ -1457,9 +1475,9 @@ async function update_clients(){
       bandClass='w24'; label='WiFi'; devType='wifi';
     }
 
-    // Device icon: TV=▤ PC/wired=▣ WiFi=◎
-    const symMap={tv:'▤',pc:'▣',wifi:'◎'};
-    const sym=symMap[devType]||'·';
+    // Device icon D1 style: [PC] [TV] [WF]
+    const symMap={tv:'[TV]',pc:'[PC]',wifi:'[WF]'};
+    const sym=symMap[devType]||'[?]';
     const displayName=(l.name&&l.name!=='*'&&l.name!=='')?l.name:mac.toUpperCase().replace(/:/g,'').slice(0,12);
 
     html+=`<div class="client-row">
@@ -1711,6 +1729,10 @@ async function reboot_router(btn){
 // ===== MAIN LOOP =====
 async function init(){
   try{await luci_login();}catch(e){console.warn('login',e);}
+  if(C.wifi_ap&&!C.wifi_ap_pass){
+    const p=prompt('WiFi AP admin password for '+C.wifi_ap+':');
+    if(p!==null) C.wifi_ap_pass=p;
+  }
   await Promise.allSettled([init_cores(), update_board(), init_lat_groups()]);
   init_wifi_admin_link();
   async function fast(){ await Promise.allSettled([update_cpu(),update_sysinfo(),update_net(),update_temp()]); setTimeout(fast,C.fast); }

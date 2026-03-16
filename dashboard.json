@@ -1,42 +1,143 @@
 {
-	"dashboard": {
-		"description": "Grant access to dashboard data collection",
-		"read": {
-			"file": {
-				"/proc/stat": ["read"],
-				"/proc/cpuinfo": ["read"],
-				"/proc/loadavg": ["read"],
-				"/proc/meminfo": ["read"],
-				"/proc/net/arp": ["read"],
-				"/proc/net/dev": ["read"],
-				"/proc/sys/net/netfilter/nf_conntrack_count": ["read"],
-				"/proc/sys/net/netfilter/nf_conntrack_max": ["read"],
-				"/sys/class/thermal/thermal_zone*": ["read"],
-				"/sys/class/thermal/thermal_zone*/temp": ["read"],
-				"/sys/class/net/*/speed": ["read"],
-				"/tmp/dhcp.leases": ["read"],
-				"/bin/cat": ["exec"],
-				"/bin/ping": ["exec"],
-				"/usr/bin/ping": ["exec"],
-				"/usr/sbin/sensors": ["exec"],
-				"/usr/sbin/nft": ["exec"],
-				"/usr/sbin/ethtool": ["exec"],
-				"/usr/bin/ethtool": ["exec"],
-				"/usr/bin/curl": ["exec"],
-				"/sbin/logread": ["exec"],
-				"/etc/init.d/*": ["exec"],
-				"/usr/bin/iwinfo": ["exec"],
-				"/bin/ls": ["exec"]
-			},
-			"ubus": {
-				"system": ["board", "info"],
-				"network.device": ["status"],
-				"network.interface": ["dump"],
-				"service": ["list"],
-				"luci": ["getMountPoints", "getBlockDevices", "getRealtimeStats", "getProcessList"],
-				"file": ["read", "exec", "list"],
-				"network.wireless": ["status"]
-			}
-		}
-	}
+  "dashboard": {
+    "description": "OpenWRT DarkBoard ACL",
+    "read": {
+      "ubus": {
+        "session": [
+          "access",
+          "login"
+        ],
+        "file": [
+          "read",
+          "exec",
+          "list",
+          "stat"
+        ],
+        "system": [
+          "board",
+          "info"
+        ],
+        "network.interface": [
+          "dump"
+        ],
+        "network.device": [
+          "status"
+        ],
+        "network.wireless": [
+          "status"
+        ],
+        "luci": [
+          "getRealtimeStats",
+          "getProcessList",
+          "getConntrackList",
+          "getVersion",
+          "getBuiltinEthernetPorts",
+          "getMountPoints"
+        ],
+        "luci-rpc": [
+          "getBoardJSON",
+          "getHostHints",
+          "getNetworkDevices",
+          "getWirelessDevices",
+          "getDHCPLeases"
+        ],
+        "luci.nikki": [
+          "*"
+        ],
+        "service": [
+          "list"
+        ],
+        "rc": [
+          "list",
+          "init",
+          "*"
+        ]
+      },
+      "file": {
+        "/proc/cpuinfo": [
+          "read"
+        ],
+        "/proc/stat": [
+          "read"
+        ],
+        "/proc/loadavg": [
+          "read"
+        ],
+        "/proc/meminfo": [
+          "read"
+        ],
+        "/proc/net/arp": [
+          "read"
+        ],
+        "/proc/net/dev": [
+          "read"
+        ],
+        "/proc/sys/net/netfilter/nf_conntrack_count": [
+          "read"
+        ],
+        "/proc/sys/net/netfilter/nf_conntrack_max": [
+          "read"
+        ],
+        "/tmp/dhcp.leases": [
+          "read"
+        ],
+        "/tmp/.asus_tok": [
+          "read",
+          "write"
+        ],
+        "/sys/class/thermal/thermal_zone*/temp": [
+          "read"
+        ],
+        "/sys/class/net/*/speed": [
+          "read"
+        ],
+        "/usr/bin/curl": [
+          "exec"
+        ],
+        "/usr/bin/ethtool": [
+          "exec"
+        ],
+        "/usr/sbin/ethtool": [
+          "exec"
+        ],
+        "/usr/bin/ping": [
+          "exec"
+        ],
+        "/bin/ping": [
+          "exec"
+        ],
+        "/usr/bin/iwinfo": [
+          "exec"
+        ],
+        "/usr/bin/sensors": [
+          "exec"
+        ],
+        "/usr/sbin/sensors": [
+          "exec"
+        ],
+        "/usr/sbin/nft": [
+          "exec"
+        ],
+        "/usr/sbin/nft --terse --json list ruleset": [
+          "exec"
+        ],
+        "/usr/bin/nvme": [
+          "exec"
+        ],
+        "/etc/init.d/*": [
+          "exec"
+        ]
+      }
+    },
+    "write": {
+      "ubus": {
+        "luci": [
+          "setInitAction"
+        ],
+        "service": [
+          "list"
+        ]
+      }
+    }
+  }
 }
