@@ -15,7 +15,7 @@ NC=$(printf '\033[0m')
 
 ok()   { printf "${GRN}[OK]${NC} %s\n" "$1"; }
 err()  { printf "${RED}[ERR]${NC} %s\n" "$1"; exit 1; }
-ask()  { printf "${YEL}[?]${NC} %s " "$1"; read -r ans; echo "$ans"; }
+ask() { printf "${YEL}[?]${NC} %s " "$1"; read -r ans < /dev/tty; echo "$ans"; }
 info() { printf "${YEL}[i]${NC} %s\n" "$1"; }
 TITLE(){ printf "\n${GRN}===  %s  ===${NC}\n" "$*"; }
 
