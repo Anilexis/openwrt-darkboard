@@ -3,101 +3,39 @@
 		"description": "Grant access to dashboard data collection",
 		"read": {
 			"file": {
-				"/proc/stat": [
-					"read"
-				],
-				"/proc/cpuinfo": [
-					"read"
-				],
-				"/proc/meminfo": [
-					"read"
-				],
-				"/proc/sys/net/netfilter/nf_conntrack_count": [
-					"read"
-				],
-				"/proc/sys/net/netfilter/nf_conntrack_max": [
-					"read"
-				],
-				"/sys/class/thermal/thermal_zone*": [
-					"read"
-				],
-				"/sys/class/thermal/thermal_zone*/temp": [
-					"read"
-				],
-				"/sys/class/net/*/speed": [
-					"read"
-				],
-				"/tmp/dhcp.leases": [
-					"read"
-				],
-				"/bin/cat": [
-					"exec"
-				],
-				"/bin/ping": [
-					"exec"
-				],
-				"/usr/bin/ping": [
-					"exec"
-				],
-				"/usr/sbin/sensors": [
-					"exec"
-				],
-				"/usr/sbin/nft": [
-					"exec"
-				],
-				"/usr/sbin/ethtool": [
-					"exec"
-				],
-				"/usr/bin/ethtool": [
-					"exec"
-				],
-				"/usr/bin/curl": [
-					"exec"
-				],
-				"/sbin/logread": [
-					"exec"
-				],
-				"/etc/init.d/*": [
-					"exec"
-				],
-				"/proc/net/dev": [
-					"read"
-				],
-				"/usr/bin/iwinfo": [
-					"exec"
-				],
-				"/bin/ls": [
-					"exec"
-				]
+				"/proc/stat": ["read"],
+				"/proc/cpuinfo": ["read"],
+				"/proc/loadavg": ["read"],
+				"/proc/meminfo": ["read"],
+				"/proc/net/arp": ["read"],
+				"/proc/net/dev": ["read"],
+				"/proc/sys/net/netfilter/nf_conntrack_count": ["read"],
+				"/proc/sys/net/netfilter/nf_conntrack_max": ["read"],
+				"/sys/class/thermal/thermal_zone*": ["read"],
+				"/sys/class/thermal/thermal_zone*/temp": ["read"],
+				"/sys/class/net/*/speed": ["read"],
+				"/tmp/dhcp.leases": ["read"],
+				"/bin/cat": ["exec"],
+				"/bin/ping": ["exec"],
+				"/usr/bin/ping": ["exec"],
+				"/usr/sbin/sensors": ["exec"],
+				"/usr/sbin/nft": ["exec"],
+				"/usr/sbin/ethtool": ["exec"],
+				"/usr/bin/ethtool": ["exec"],
+				"/usr/bin/curl": ["exec"],
+				"/sbin/logread": ["exec"],
+				"/etc/init.d/*": ["exec"],
+				"/usr/bin/iwinfo": ["exec"],
+				"/bin/ls": ["exec"]
 			},
 			"ubus": {
-				"system": [
-					"board",
-					"info"
-				],
-				"network.device": [
-					"status"
-				],
-				"network.interface": [
-					"dump"
-				],
-				"service": [
-					"list"
-				],
-				"luci": [
-					"getMountPoints",
-					"getBlockDevices",
-					"getRealtimeStats",
-					"getProcessList"
-				],
-				"file": [
-					"read",
-					"exec",
-					"list"
-				],
-				"network.wireless": [
-					"status"
-				]
+				"system": ["board", "info"],
+				"network.device": ["status"],
+				"network.interface": ["dump"],
+				"service": ["list"],
+				"luci": ["getMountPoints", "getBlockDevices", "getRealtimeStats", "getProcessList"],
+				"file": ["read", "exec", "list"],
+				"network.wireless": ["status"]
 			}
 		}
 	}

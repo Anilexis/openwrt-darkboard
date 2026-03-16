@@ -86,8 +86,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .grid{
   display:grid;
   grid-template-columns: 1fr 2fr 1fr 1fr;
-  grid-template-rows: auto auto auto;
-  align-items: start;
+  grid-template-rows: minmax(min-content,1fr) minmax(min-content,1fr) minmax(min-content,1fr);
   grid-template-areas:
     "cpu    memory  storage  services"
     "ifaces latency wan      services"
@@ -98,9 +97,9 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 }
 
 /* Grid area assignments */
-.cell-cpu       {grid-area:cpu;align-self:start;}
-.cell-memory    {grid-area:memory;align-self:start;}
-.cell-storage   {grid-area:storage;align-self:start;}
+.cell-cpu       {grid-area:cpu;}
+.cell-memory    {grid-area:memory;}
+.cell-storage   {grid-area:storage;}
 .cell-services  {grid-area:services;}
 .cell-interfaces{grid-area:ifaces;}
 .cell-latency   {grid-area:latency;}
@@ -396,7 +395,8 @@ hr{border:none;border-top:1px solid var(--border);margin:2px 0;}
       <div class="met"><span class="ml">load 5m</span><span class="mv" id="ld5">--</span></div>
       <div class="met"><span class="ml">load 15m</span><span class="mv" id="ld15">--</span></div>
       <hr>
-      <div class="met"><span class="ml">active conns</span><span class="mv blue" id="ct-act">--</span></div>
+      <div class="met"><span class="ml">tasks</span><span class="mv muted" id="tasks-d">--</span></div>
+    <div class="met"><span class="ml">active conns</span><span class="mv blue" id="ct-act">--</span></div>
       <div class="met"><span class="ml">ct max</span><span class="mv muted" id="ct-max">--</span></div>
       <div class="bw"><div class="bar" style="height:5px"><div class="bf blue" id="ct-bar" style="width:0%"></div></div></div>
       <div class="met"><span class="ml">nft tables</span><span class="mv muted" id="nft-d">--</span></div>
@@ -475,10 +475,10 @@ hr{border:none;border-top:1px solid var(--border);margin:2px 0;}
       <div class="si" id="dns-p"></div>
     </div>
 
-    <!-- R3 C4 — WIFI AP -->
+    <!-- R3 C4 — WIFI -->
     <div class="panel cell-wifi">
       <div class="ptitle">
-        <span>WIFI AP</span>
+        <span>WIFI</span>
         <div class="ptitle-r">
           <span class="badge" id="wifi-bdg" style="background:var(--surface-3);color:var(--text-muted)">--</span>
           <a class="ext" id="wifi-admin-link" href="#" target="_blank" rel="noopener" title="WiFi AP admin" style="display:none">&#8599;</a>
@@ -511,6 +511,8 @@ const C = {
   adguard_pass:  '',
   wifi_ap:        '',                    // External WiFi AP IP (leave empty to use local wireless)
   wifi_ap_port:   '',                    // AP admin port, e.g. 8443 for HTTPS or 80/443. Leave empty to hide link
+  wifi_ap_user:   'admin',               // AP admin username (for ASUS client list API)
+  wifi_ap_pass:   '',                     // AP admin password
   wifi_ap_https:  true,                  // true = HTTPS, false = HTTP for AP admin
   fast:   2000,
   slow:   8000,
@@ -625,7 +627,7 @@ async function file_exec(command,params){
 // ===== INIT CORES (dynamic) =====
 let numCores = 0;
 async function init_cores(){
-  // Try /proc/cpuinfo first
+  // Method 1: /proc/cpuinfo
   try{
     const raw=await file_read('/proc/cpuinfo');
     if(raw){
@@ -633,12 +635,19 @@ async function init_cores(){
       if(n>0){numCores=n;build_cores(n);return;}
     }
   }catch(e){}
-  // Fallback: nproc via system.info
+  // Method 2: count cpuN lines in /proc/stat (reliable, always in ACL)
+  try{
+    const raw=await file_read('/proc/stat');
+    if(raw){
+      const n=raw.split('\n').filter(l=>/^cpu\d+\s/.test(l)).length;
+      if(n>0){numCores=n;build_cores(n);return;}
+    }
+  }catch(e){}
+  // Method 3: system.info ubus
   try{
     const r=await luci_call('system','info',{});
     const n=r?.[1]?.cpus; if(n>0){numCores=n;build_cores(n);return;}
   }catch(e){}
-  // Safe default: 4
   numCores=4; build_cores(4);
 }
 function build_cores(n){
@@ -748,6 +757,17 @@ async function update_sysinfo(){
     $('ld5').textContent=(l[1]/65536).toFixed(2);
     $('ld15').textContent=(l[2]/65536).toFixed(2);
   }
+  // Tasks from /proc/loadavg: e.g. "0.03 0.10 0.07 1/368 12345"
+  try{
+    const lraw=await file_read('/proc/loadavg');
+    if(lraw){
+      const parts=lraw.trim().split(/\s+/);
+      if(parts[3]){
+        const[run,tot]=parts[3].split('/');
+        const el=$('tasks-d'); if(el) el.textContent=tot+' tasks, '+run+' run';
+      }
+    }
+  }catch(e){}
   if(info.memory){
     const m=info.memory;
     const{total,free,buffered:buf,cached:cch,available:avail}=m;
@@ -1262,10 +1282,17 @@ async function update_mihomo(){
 
 // ===== ADGUARD =====
 async function agh_api(endpoint){
-  const creds = C.adguard_pass.includes(':') ? C.adguard_pass : C.adguard_user + ':' + C.adguard_pass;
-  const b64 = btoa(creds);
-  const r=await file_exec('/usr/bin/curl',['-s','-m','3','-H','Authorization: Basic '+b64, 'http://'+C.adguard_host+':'+C.adguard_port+endpoint]);
+  const pass=C.adguard_pass||'';
+  const user=C.adguard_user||'admin';
+  const b64=btoa(user+':'+pass);
+  const r=await file_exec('/usr/bin/curl',[
+    '-s','-m','5','-k',
+    '-H','Authorization: Basic '+b64,
+    'http://'+C.adguard_host+':'+C.adguard_port+endpoint
+  ]);
   const out=r?.stdout?.trim(); if(!out) return null;
+  // Detect auth failure
+  if(out.startsWith('Unauthorized')||out.startsWith('401')) return null;
   try{return JSON.parse(out);}catch(e){return null;}
 }
 async function update_adguard(){
@@ -1288,14 +1315,19 @@ async function update_adguard(){
       }
     }
     if(status){
-      if(html) html+='<hr>';
+      if(html && !html.endsWith('<hr>')) html+='<hr>';
       html+=`<div class="ds"><span class="dl">filtering</span><span class="dv ${status.protection_enabled?'ok':'err'}">${status.protection_enabled?'ON':'OFF'}</span></div>`;
       if(status.dns_addresses?.length){
         html+=`<div class="ds"><span class="dl">upstream DNS</span><span class="dv" style="color:var(--text-muted)">${status.dns_addresses[0]}:${status.dns_port||53}</span></div>`;
       }
     }
     const bdg=$('agh-bdg');
-    if(stats||status){bdg.className='badge b-ok';bdg.textContent='UP';}
+    if(stats||status){
+      bdg.className='badge b-ok';bdg.textContent='UP';
+    }else{
+      bdg.className='badge b-err';bdg.textContent='ERR';
+      html='<div class="met"><span class="ml" style="color:var(--red)">API unreachable — check host/port/password in config</span></div>';
+    }
     $('dns-p').innerHTML=html||'<div class="met"><span class="ml muted">no data</span></div>';
   }catch(e){
     $('dns-p').innerHTML='<div class="svc"><div class="dot err"></div><span class="sname">AdGuard API</span><span class="sstatus err">OFFLINE</span></div>';
@@ -1318,7 +1350,6 @@ const TV_PATTERNS = [/android.*tv/i,/smarttv/i,/tv$/i,/television/i];
 
 async function update_clients(){
   let leases=[];
-  // Read dnsmasq leases
   try{
     const raw=await file_read('/tmp/dhcp.leases');
     if(raw){
@@ -1330,37 +1361,28 @@ async function update_clients(){
   }catch(e){}
 
   if(!leases.length){
-    $('clients-p').innerHTML='<div class="met"><span class="ml" style="color:var(--text-faint)">no leases (check /tmp/dhcp.leases)</span></div>';
+    $('clients-p').innerHTML='<div class="met"><span class="ml" style="color:var(--text-faint)">no leases</span></div>';
     $('cl-bdg').textContent='0'; $('cl-bdg').className='badge'; $('cl-bdg').style.cssText='background:var(--surface-3);color:var(--text-muted)';
     return;
   }
+  leases.sort((a,b)=>(parseInt(a.ip.split('.')[3])||0)-(parseInt(b.ip.split('.')[3])||0));
 
-  // Sort by last IP octet
-  leases.sort((a,b)=>{
-    const ai=parseInt(a.ip.split('.')[3])||0, bi=parseInt(b.ip.split('.')[3])||0;
-    return ai-bi;
-  });
-
-  // Build per-band MAC sets via wireless ubus + iwinfo assoclist
+  // --- Band detection 1: local wireless via iwinfo ---
   const mac5g=new Set(), mac24g=new Set();
   try{
     const r=await luci_call('network.wireless','status',{});
     const wl=r?.[1];
-    if(wl && typeof wl==='object'){
-      for(const [,rdata] of Object.entries(wl)){
+    if(wl&&typeof wl==='object'){
+      for(const[,rdata] of Object.entries(wl)){
         const cfg=rdata.config||{};
-        const band=cfg.band||'';
-        const hwmode=(cfg.hwmode||cfg.htmode||'').toLowerCase();
-        const is5g=band==='5g'||hwmode.includes('a');
+        const is5g=(cfg.band||'')==='5g'||(cfg.hwmode||cfg.htmode||'').toLowerCase().includes('a');
         for(const iface of (rdata.interfaces||[])){
           const ifname=iface.ifname; if(!ifname) continue;
           try{
             const r2=await file_exec('/usr/bin/iwinfo',[ifname,'assoclist']);
-            if(r2?.code===0 && r2.stdout){
-              for(const m of r2.stdout.matchAll(/([0-9A-Fa-f:]{17})\s+Signal/g)){
-                const mac=m[1].toLowerCase();
-                if(is5g) mac5g.add(mac); else mac24g.add(mac);
-              }
+            if(r2?.code===0&&r2.stdout){
+              for(const m of r2.stdout.matchAll(/([0-9A-Fa-f:]{17})\s+Signal/g))
+                (is5g?mac5g:mac24g).add(m[1].toLowerCase());
             }
           }catch(e){}
         }
@@ -1368,36 +1390,80 @@ async function update_clients(){
     }
   }catch(e){}
 
-  // Get wired interface speeds for display
+  // --- Band detection 2: ASUS AP appGet.cgi ---
+  const asusMap={};
+  if(C.wifi_ap){
+    try{
+      const proto=C.wifi_ap_https?'https':'http';
+      const port=C.wifi_ap_port||80;
+      const b64=btoa((C.wifi_ap_user||'admin')+':'+(C.wifi_ap_pass||''));
+      const r=await file_exec('/usr/bin/curl',[
+        '-s','-m','5','-k',
+        '-H','Authorization: Basic '+b64,
+        proto+'://'+C.wifi_ap+':'+port+'/appGet.cgi?hook=get_clientlist()'
+      ]);
+      if(r?.code===0&&r.stdout){
+        const m=r.stdout.match(/get_clientlist\s*=\s*(\{[\s\S]*\})/);
+        if(m){
+          const cl=JSON.parse(m[1]);
+          for(const[mac,info] of Object.entries(cl)){
+            if(typeof info==='object'&&info.from)
+              asusMap[mac.toLowerCase()]={band:info.from,rssi:info.rssi||null};
+          }
+        }
+      }
+    }catch(e){}
+  }
+
+  // --- ARP table for wired port detection ---
+  const arpMap={};
+  try{
+    const raw=await file_read('/proc/net/arp');
+    if(raw){
+      for(const line of raw.split('\n').slice(1)){
+        const p=line.trim().split(/\s+/);
+        if(p.length>=6) arpMap[p[0]]={mac:p[3].toLowerCase(),iface:p[5]};
+      }
+    }
+  }catch(e){}
+
   const ethPorts=Object.entries(ifaceSpdMap).filter(([n])=>/^eth\d/.test(n));
 
   let html='';
   for(const l of leases){
     const mac=(l.mac||'').toLowerCase().trim();
     const isTV=TV_PATTERNS.some(p=>p.test(l.name||''));
+    const arpIface=(arpMap[l.ip]?.iface)||'';
+    const asusInfo=asusMap[mac];
 
-    let iconClass,label;
+    let bandClass,label,devType;
     if(isTV){
-      iconClass='eth'; label='TV';
+      bandClass='eth'; label='TV'; devType='tv';
+    }else if(asusInfo){
+      if(/^5/i.test(asusInfo.band)){bandClass='w5';label='WiFi 5G';devType='wifi';}
+      else if(/^2\.?4/i.test(asusInfo.band)){bandClass='w24';label='WiFi 2.4G';devType='wifi';}
+      else{bandClass='eth';label='wired';devType='pc';}
     }else if(mac5g.has(mac)){
-      iconClass='w5'; label='5GHz';
+      bandClass='w5'; label='WiFi 5G'; devType='wifi';
     }else if(mac24g.has(mac)){
-      iconClass='w24'; label='2.4GHz';
-    }else if(WIRED_IPS.has(l.ip)){
-      const spdEntry=ethPorts[0];
-      const spd=spdEntry?spdEntry[1]:'';
-      iconClass='eth'; label=spd?spd+' wired':'wired';
+      bandClass='w24'; label='WiFi 2.4G'; devType='wifi';
+    }else if(WIRED_IPS.has(l.ip)||(arpIface&&/^eth\d$/.test(arpIface))){
+      const port=(/^eth\d$/.test(arpIface))?arpIface.toUpperCase():'ETH';
+      const spd=(ethPorts.find(([n])=>n===arpIface)||ethPorts[0])?.[1]||'';
+      bandClass='eth'; label=(spd?spd+' ':'')+'W '+port; devType='pc';
     }else if(SAMSUNG_OUI.some(p=>mac.startsWith(p))){
-      iconClass='w5'; label='5GHz';
+      bandClass='w5'; label='WiFi 5G'; devType='wifi';
     }else{
-      iconClass='w24'; label='WiFi';
+      bandClass='w24'; label='WiFi'; devType='wifi';
     }
 
-    const icons={w5:'⊙',w24:'○',eth:'▫'};
+    // Device icon: TV=▤ PC/wired=▣ WiFi=◎
+    const symMap={tv:'▤',pc:'▣',wifi:'◎'};
+    const sym=symMap[devType]||'·';
     const displayName=(l.name&&l.name!=='*'&&l.name!=='')?l.name:mac.toUpperCase().replace(/:/g,'').slice(0,12);
 
     html+=`<div class="client-row">
-      <i class="cicon ${iconClass}" title="${label}">${icons[iconClass]||'·'}</i>
+      <i class="cicon ${bandClass}" title="${label}">${sym}</i>
       <span class="cname" title="${mac}">${displayName}</span>
       <span class="cip">.${l.ip.split('.')[3]}</span>
       <span class="cspd">${label}</span>
@@ -1410,6 +1476,7 @@ async function update_clients(){
   bdg.className='badge b-ok';
   bdg.style.cssText='';
 }
+
 
 // ===== WIFI AP / LOCAL WIRELESS =====
 // Supports two modes:
