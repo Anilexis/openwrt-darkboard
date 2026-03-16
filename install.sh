@@ -1,3 +1,4 @@
+Создано с помощью Perplexity
 #!/bin/sh
 # ============================================================
 #  OpenWRT Dashboard — install.sh
@@ -85,16 +86,16 @@ CONFIRM=$(ask "Apply? [Y/n]")
 [ "$CONFIRM" = "n" ] || [ "$CONFIRM" = "N" ] && { info "Aborted."; exit 0; }
 
 # ============================================================
-# 2. Download files from GitHub (if not already present locally)
+# 2. Download files from GitHub (always fresh)
 # ============================================================
-if [ ! -f "$DASH_SRC" ] || [ ! -f "$ACL_SRC" ]; then
-  info "Local files not found — downloading from GitHub..."
-  wget -q -O "$DASH_SRC" "$REPO_URL/dashboard.html" || err "Failed to download dashboard.html"
-  wget -q -O "$ACL_SRC"  "$REPO_URL/dashboard.json" || err "Failed to download dashboard.json"
-  ok "Files downloaded successfully"
-else
-  ok "Using local files"
-fi
+DASH_TMP="/tmp/dashboard_dl.html"
+ACL_TMP="/tmp/dashboard_dl.json"
+info "Downloading latest files from GitHub..."
+wget -q -O "$DASH_TMP" "$REPO_URL/dashboard.html" || err "Failed to download dashboard.html"
+wget -q -O "$ACL_TMP"  "$REPO_URL/dashboard.json"  || err "Failed to download dashboard.json"
+ok "Files downloaded successfully"
+DASH_SRC="$DASH_TMP"
+ACL_SRC="$ACL_TMP"
 
 # ============================================================
 # 3. Patch dashboard.html with user values
@@ -128,7 +129,7 @@ ok "Installed $DASH_DST"
 cp "$ACL_SRC" "$ACL_DST"
 ok "Installed $ACL_DST"
 
-rm -f /tmp/dashboard_install.html
+rm -f /tmp/dashboard_install.html "$DASH_TMP" "$ACL_TMP"
 
 # ============================================================
 # 5. Restart rpcd to apply ACL
