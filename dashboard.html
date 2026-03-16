@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#0d0f0e">
-<title>OpenWrt N100 Dashboard</title>
+<title>OpenWRT DarkBoard</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
@@ -86,7 +86,8 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .grid{
   display:grid;
   grid-template-columns: 1fr 2fr 1fr 1fr;
-  grid-template-rows: minmax(0,1.2fr) minmax(0,1fr) minmax(0,1fr);
+  grid-template-rows: auto auto auto;
+  align-items: start;
   grid-template-areas:
     "cpu    memory  storage  services"
     "ifaces latency wan      services"
@@ -97,9 +98,9 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 }
 
 /* Grid area assignments */
-.cell-cpu       {grid-area:cpu;}
-.cell-memory    {grid-area:memory;}
-.cell-storage   {grid-area:storage;}
+.cell-cpu       {grid-area:cpu;align-self:start;}
+.cell-memory    {grid-area:memory;align-self:start;}
+.cell-storage   {grid-area:storage;align-self:start;}
 .cell-services  {grid-area:services;}
 .cell-interfaces{grid-area:ifaces;}
 .cell-latency   {grid-area:latency;}
@@ -422,7 +423,7 @@ hr{border:none;border-top:1px solid var(--border);margin:2px 0;}
 
     <!-- R1-R2 C4 — SERVICES (spans 2 rows) -->
     <div class="panel cell-services">
-      <div class="ptitle">SERVICES</div>
+      <div class="ptitle">SERVICES<div class="ptitle-r"><button class="svc-action" title="Reboot router" onclick="reboot_router(this)">&#x23FB;</button></div></div>
       <div class="si" id="svc-p"></div>
     </div>
 
@@ -648,7 +649,7 @@ function build_cores(n){
   grid.style.gridTemplateColumns=`repeat(${cols},1fr)`;
   let html='';
   for(let i=0;i<n;i++){
-    html+=`<div class="core"><div class="corebar"><div class="corefill" id="cc${i}"></div><div class="corebar-max" id="cm${i}" style="bottom:0"></div></div><div class="corelbel">C${i}</div><div class="coreval" id="cv${i}">--%</div><div class="core-maxval" id="cmv${i}">0%</div></div>`;
+    html+=`<div class="core"><div class="corebar"><div class="corefill" id="cc${i}"></div><div class="corebar-max" id="cm${i}" style="bottom:0"></div></div><div class="corelbel">C${i}</div><div class="coreval" id="cv${i}">--%</div><div class="core-maxval" id="cmv${i}">max 0%</div></div>`;
   }
   grid.innerHTML=html;
 }
@@ -710,7 +711,7 @@ async function update_cpu(){
           if(f){f.style.height=p+'%';f.style.background=p>80?'var(--red)':p>50?'var(--yellow)':'var(--green)';}
           if(v){v.textContent=p+'%';v.style.color=p>80?'var(--red)':p>50?'var(--yellow)':'var(--green)';}
           if(mx){mx.style.bottom=maxCPU[i]+'%';mx.title='max '+maxCPU[i]+'%';}
-          const mv=$('cmv'+i); if(mv) mv.textContent=maxCPU[i]+'%';
+          const mv=$('cmv'+i); if(mv) mv.textContent='max '+maxCPU[i]+'%';
         }
         pCPU=curr; return;
       }
@@ -728,7 +729,7 @@ async function update_cpu(){
       if(f){f.style.height=pct+'%';f.style.background=pct>80?'var(--red)':pct>50?'var(--yellow)':'var(--green)';}
       if(v){v.textContent='~'+pct+'%';v.style.color=pct>80?'var(--red)':pct>50?'var(--yellow)':'var(--green)';}
       if(mx){mx.style.bottom=maxCPU[i]+'%';mx.title='max '+maxCPU[i]+'%';}
-      if(mv) mv.textContent=maxCPU[i]+'%';
+      if(mv) mv.textContent='max '+maxCPU[i]+'%';
     }
   }
 }
@@ -898,7 +899,7 @@ async function update_net(){
   const now=Date.now(); let html='';
   ifaceSpdMap={};
   const entries=Object.entries(devs)
-    .filter(([n])=>/^(eth|pppoe|br-|awg|wan|lan)/.test(n))
+    .filter(([n])=>/^eth\d/.test(n))
     .sort(([a],[b])=>a.localeCompare(b));
   for(const[name,d]of entries){
     const s=d.statistics||{};
@@ -1264,7 +1265,7 @@ async function agh_api(endpoint){
   const creds = C.adguard_pass.includes(':') ? C.adguard_pass : C.adguard_user + ':' + C.adguard_pass;
   const b64 = btoa(creds);
   const r=await file_exec('/usr/bin/curl',['-s','-m','3','-H','Authorization: Basic '+b64, 'http://'+C.adguard_host+':'+C.adguard_port+endpoint]);
-  const out=r.stdout?.trim(); if(!out) return null;
+  const out=r?.stdout?.trim(); if(!out) return null;
   try{return JSON.parse(out);}catch(e){return null;}
 }
 async function update_adguard(){
@@ -1280,7 +1281,8 @@ async function update_adguard(){
       if(s.top_blocked_domains?.length){
         html+='<hr>';
         for(const item of s.top_blocked_domains.slice(0,3)){
-          const d=item.name, c=item.count;
+          const d=item?.name, c=item?.count;
+          if(!d) continue;
           html+=`<div class="ds"><span class="dl" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:70%">${d}</span><span class="dv warn">${c}</span></div>`;
         }
       }
@@ -1339,31 +1341,58 @@ async function update_clients(){
     return ai-bi;
   });
 
+  // Build per-band MAC sets via wireless ubus + iwinfo assoclist
+  const mac5g=new Set(), mac24g=new Set();
+  try{
+    const r=await luci_call('network.wireless','status',{});
+    const wl=r?.[1];
+    if(wl && typeof wl==='object'){
+      for(const [,rdata] of Object.entries(wl)){
+        const cfg=rdata.config||{};
+        const band=cfg.band||'';
+        const hwmode=(cfg.hwmode||cfg.htmode||'').toLowerCase();
+        const is5g=band==='5g'||hwmode.includes('a');
+        for(const iface of (rdata.interfaces||[])){
+          const ifname=iface.ifname; if(!ifname) continue;
+          try{
+            const r2=await file_exec('/usr/bin/iwinfo',[ifname,'assoclist']);
+            if(r2?.code===0 && r2.stdout){
+              for(const m of r2.stdout.matchAll(/([0-9A-Fa-f:]{17})\s+Signal/g)){
+                const mac=m[1].toLowerCase();
+                if(is5g) mac5g.add(mac); else mac24g.add(mac);
+              }
+            }
+          }catch(e){}
+        }
+      }
+    }
+  }catch(e){}
+
   // Get wired interface speeds for display
-  const wiredSpdStr = Object.entries(ifaceSpdMap)
-    .filter(([n])=>/^eth/.test(n)||/^br-lan/.test(n))
-    .map(([,s])=>s)[0]||'';
+  const ethPorts=Object.entries(ifaceSpdMap).filter(([n])=>/^eth\d/.test(n));
 
   let html='';
   for(const l of leases){
     const mac=(l.mac||'').toLowerCase().trim();
-    const macShort=mac.replace(/:/g,'').slice(0,6);
-    const isWired=WIRED_IPS.has(l.ip);
     const isTV=TV_PATTERNS.some(p=>p.test(l.name||''));
-    const isSamsung=SAMSUNG_OUI.some(p=>mac.startsWith(p));
 
     let iconClass,label;
     if(isTV){
-      iconClass='eth'; label='TV 100M';
-    }else if(isWired){
-      iconClass='eth'; label=wiredSpdStr?wiredSpdStr+' wired':'wired';
-    }else if(isSamsung){
+      iconClass='eth'; label='TV';
+    }else if(mac5g.has(mac)){
+      iconClass='w5'; label='5GHz';
+    }else if(mac24g.has(mac)){
+      iconClass='w24'; label='2.4GHz';
+    }else if(WIRED_IPS.has(l.ip)){
+      const spdEntry=ethPorts[0];
+      const spd=spdEntry?spdEntry[1]:'';
+      iconClass='eth'; label=spd?spd+' wired':'wired';
+    }else if(SAMSUNG_OUI.some(p=>mac.startsWith(p))){
       iconClass='w5'; label='5GHz';
     }else{
       iconClass='w24'; label='WiFi';
     }
 
-    // WiFi icon SVG-like characters
     const icons={w5:'⊙',w24:'○',eth:'▫'};
     const displayName=(l.name&&l.name!=='*'&&l.name!=='')?l.name:mac.toUpperCase().replace(/:/g,'').slice(0,12);
 
@@ -1595,6 +1624,21 @@ async function update_ntp_sync(){
     if(running){$('tb-ntp').textContent='ntp:ok';$('tb-ntp').style.color='var(--text-muted)';return;}
   }catch(e){}
   $('tb-ntp').textContent='ntp:?'; $('tb-ntp').style.color='var(--yellow)';
+}
+
+// ===== REBOOT =====
+async function reboot_router(btn){
+  if(!confirm('Reboot the router now?\nAll connections will be interrupted.')) return;
+  btn.disabled=true; btn.classList.add('spinning');
+  try{
+    await luci_call('system','reboot',{});
+    btn.style.color='var(--yellow)';
+    btn.title='Rebooting…';
+  }catch(e){
+    btn.style.color='var(--red)';
+    btn.title='Reboot failed';
+  }
+  setTimeout(()=>{btn.disabled=false;btn.classList.remove('spinning');btn.style.color='';},3000);
 }
 
 // ===== MAIN LOOP =====
