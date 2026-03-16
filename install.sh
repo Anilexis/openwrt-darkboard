@@ -1,1 +1,146 @@
-IyEvYmluL3NoCiMgPT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09CiMgIE9wZW5XUlQgRGFzaGJvYXJkIOKAlCBpbnN0YWxsLnNoCiMgIFdvcmtzIG9uIE9wZW5XUlQgMjMueCAvIDI0LnggLyAyNS54IChhcGsgb3Igb3BrZykKIwojICBPbmUtbGluZXIgaW5zdGFsbCAocnVuIGRpcmVjdGx5IG9uIHRoZSByb3V0ZXIpOgojICAgIHdnZXQgLXFPLSBodHRwczovL3Jhdy5naXRodWJ1c2VyY29udGVudC5jb20vQW5pbGV4aXMvb3BlbndydC1kYXJrYm9hcmQvbWFpbi9pbnN0YWxsLnNoIHwgc2gKIwojICBPciBkb3dubG9hZCBmaXJzdCwgdGhlbiBydW46CiMgICAgd2dldCBodHRwczovL3Jhdy5naXRodWJ1c2VyY29udGVudC5jb20vQW5pbGV4aXMvb3BlbndydC1kYXJrYm9hcmQvbWFpbi9pbnN0YWxsLnNoCiMgICAgc2ggaW5zdGFsbC5zaAojID09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PQpzZXQgLWUKCkRBU0hfU1JDPSJkYXNoYm9hcmQuaHRtbCIKREFTSF9EU1Q9Ii93d3cvZGFzaGJvYXJkLmh0bWwiCkFDTF9EU1Q9Ii91c3Ivc2hhcmUvcnBjZC9hY2wuZC9kYXNoYm9hcmQuanNvbiIKQUNMX1NSQz0iZGFzaGJvYXJkLmpzb24iClJFUE9fVVJMPSJodHRwczovL3Jhdy5naXRodWJ1c2VyY29udGVudC5jb20vQW5pbGV4aXMvb3BlbndydC1kYXJrYm9hcmQvbWFpbiIKClJFRD0kKHByaW50ZiAnXDAzM1swOzMxbScpCkdSTj0kKHByaW50ZiAnXDAzM1swOzMybScpCllFTD0kKHByaW50ZiAnXDAzM1sxOzMzbScpCk5DPSQocHJpbnRmICdcMDMzWzBtJykKb2soKSAgeyBwcmludGYgIiR7R1JOfVtPS10ke05DfSAlc1xuIiAiJDEiOyB9CmVycigpIHsgcHJpbnRmICIke1JFRH1bRVJSXSR7TkN9ICVzXG4iICIkMSI7IGV4aXQgMTsgfQphc2soKSB7IHByaW50ZiAiJHtZRUx9PyR7TkN9ICVzOiAiICIkMSIgPi9kZXYvdHR5OyByZWFkIC1yIGFucyA8L2Rldi90dHk7IGVjaG8gIiRhbnMiOyB9CmluZm8oKXsgcHJpbnRmICIke1lFTH1baV0ke05DfSAlc1xuIiAiJDEiOyB9CgojID09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PQojIDAuIERldGVjdCBwYWNrYWdlIG1hbmFnZXIKIyA9PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT0KaWYgY29tbWFuZCAtdiBhcGsgPi9kZXYvbnVsbCAyPiYxOyB0aGVuCiAgUEtHX01HUj0iYXBrIgplbGlmIGNvbW1hbmQgLXYgb3BrZyA+L2Rldi9udWxsIDI+JjE7IHRoZW4KICBQS0dfTUdSPSJvcGtnIgplbHNlCiAgZXJyICJOZWl0aGVyIGFwayBub3Igb3BrZyBmb3VuZC4gSXMgdGhpcyByZWFsbHkgT3BlbldSVD8iCmZpCm9rICJQYWNrYWdlIG1hbmFnZXI6ICRQS0dfTUdSIgoKIyA9PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT0KIyAxLiBDb2xsZWN0IHNldHRpbmdzCiMgPT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09CmVjaG8gIiIKaW5mbyAiPT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PSIKaW5mbyAiICBEYXNoYm9hcmQgc2V0dXAg4oCUIGVudGVyIHlvdXIgc2V0dGluZ3MgIgppbmZvICI9PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09IgplY2hvICIiCgpST1VURVJfSVA9JChhc2sgIlJvdXRlciBJUCBbZGVmYXVsdDogMTkyLjE2OC4xLjFdIikKWyAteiAiJFJPVVRFUl9JUCIgXSAmJiBST1VURVJfSVA9IjE5Mi4xNjguMS4xIgplY2hvICIkUk9VVEVSX0lQIiB8IGdyZXAgLXFFICdeWzAtOV0rXC5bMC05XStcLlswLTldK1wuWzAtOV0rJCcgfHwgZXJyICJJbnZhbGlkIElQIGFkZHJlc3M6ICRST1VURVJfSVAiCgpBREdfRU5BQkxFPSQoYXNrICJFbmFibGUgQWRHdWFyZCBIb21lIGludGVncmF0aW9uPyBbeS9OXSIpCkFER19VU0VSPSIiOyBBREdfUEFTUz0iIjsgQURHX1BPUlQ9IjMwMzAiCmlmIFsgIiRBREdfRU5BQkxFIiA9ICJ5IiBdIHx8IFsgIiRBREdfRU5BQkxFIiA9ICJZIiBdOyB0aGVuCiAgQURHX1VTRVI9JChhc2sgIkFkR3VhcmQgYWRtaW4gdXNlcm5hbWUgW2RlZmF1bHQ6IGFkbWluXSIpCiAgWyAteiAiJEFER19VU0VSIiBdICYmIEFER19VU0VSPSJhZG1pbiIKICBBREdfUE9SVD0kKGFzayAiQWRHdWFyZCBwb3J0IFtkZWZhdWx0OiAzMDMwXSIpCiAgWyAteiAiJEFER19QT1JUIiBdICYmIEFER19QT1JUPSIzMDMwIgpmaQoKV0lGSV9BUD0kKGFzayAiRXh0ZXJuYWwgV2lGaSBBUCBJUCAoZS5nLiAxOTIuMTY4LjEuMTAwLCBsZWF2ZSBlbXB0eSB0byB1c2UgbG9jYWwgd2lyZWxlc3Mgb3IgZGlzYWJsZSkiKQpXSUZJX0FQX1BPUlQ9IiIKV0lGSV9BUF9IVFRQUz0idHJ1ZSIKaWYgWyAtbiAiJFdJRklfQVAiIF07IHRoZW4KICBXSUZJX0FQX1BPUlQ9JChhc2sgIldpRmkgQVAgYWRtaW4gcG9ydCAoZS5nLiA4NDQzIG9yIDgwLCBsZWF2ZSBlbXB0eSB0byBoaWRlIGxpbmspIikKICBfSFRUUFM9JChhc2sgIlVzZSBIVFRQUyBmb3IgQVAgYWRtaW4gbGluaz8gKFkvbikiKQogIFsgIiRfSFRUUFMiID0gIm4iIF0gfHwgWyAiJF9IVFRQUyIgPSAiTiIgXSAmJiBXSUZJX0FQX0hUVFBTPSJmYWxzZSIKZmkKCk1JSE9NT19QT1JUPSQoYXNrICJNaWhvbW8gQVBJIHBvcnQgW2RlZmF1bHQ6IDkwOTBdIikKWyAteiAiJE1JSE9NT19QT1JUIiBdICYmIE1JSE9NT19QT1JUPSI5MDkwIgoKZWNobyAiIgppbmZvICJTZXR0aW5nczoiCmluZm8gIiAgUm91dGVyOiAgICAgICAgICRST1VURVJfSVAiCmluZm8gIiAgTWlob21vIEFQSTogICAgICRST1VURVJfSVA6JE1JSE9NT19QT1JUIgppbmZvICIgIEFkR3VhcmQ6ICAgICAgICAke0FER19FTkFCTEU6LU59IChwb3J0ICRBR0dfUE9SVCkiCmluZm8gIiAgV2lGaSBBUDogICAgICAgICR7V0lGSV9BUDotbG9jYWwvZGlzYWJsZWR9JHtXSUZJX0FQX1BPUlQ6KyA6JHtXSUZJX0FQX1BPUlR9fSIKZWNobyAiIgoKQ09ORklSTT0kKGFzayAiQXBwbHk/IFtZL25dIikKWyAiJENPTkZJUk0iID0gIm4iIF0gfHwgWyAiJENPTkZJUk0iID0gIk4iIF0gJiYgeyBpbmZvICJBYm9ydGVkLiI7IGV4aXQgMDsgfQoKIyA9PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT0KIyAyLiBEb3dubG9hZCBmaWxlcyBmcm9tIEdpdEh1YiAoaWYgbm90IGFscmVhZHkgcHJlc2VudCBsb2NhbGx5KQojID09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PQppZiBbICEgLWYgIiREQVNIX1NSQyIgXSB8fCBbICEgLWYgIiRBQ0xfU1JDIiBdOyB0aGVuCiAgaW5mbyAiTG9jYWwgZmlsZXMgbm90IGZvdW5kIOKAlCBkb3dubG9hZGluZyBmcm9tIEdpdEh1Yi4uLiIKICB3Z2V0IC1xIC1PICIkREFTSF9TUkMiICIkUkVQT19VUkwvZGFzaGJvYXJkLmh0bWwiIHx8IGVyciAiRmFpbGVkIHRvIGRvd25sb2FkIGRhc2hib2FyZC5odG1sIgogIHdnZXQgLXEgLU8gIiRBQ0xfU1JDIiAgIiRSRVBPX1VSTC9kYXNoYm9hcmQuanNvbiIgfHwgZXJyICJGYWlsZWQgdG8gZG93bmxvYWQgZGFzaGJvYXJkLmpzb24iCiAgb2sgIkZpbGVzIGRvd25sb2FkZWQgc3VjY2Vzc2Z1bGx5IgplbHNlCiAgb2sgIlVzaW5nIGxvY2FsIGZpbGVzIgpmaQoKIyA9PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT0KIyAzLiBQYXRjaCBkYXNoYm9hcmQuaHRtbCB3aXRoIHVzZXIgdmFsdWVzCiMgPT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09CiMgSGVscGVyOiBlc2NhcGUgJiBhbmQgXCBmb3IgdXNlIGluIHNlZCByZXBsYWNlbWVudCBzdHJpbmdzCmVzY2FwZV9zZWQoKXsgcHJpbnRmICclcycgIiQxIiB8IHNlZCAncy9bJlxcXVxcXFwmL2cnOyB9CgpjcCAiJERBU0hfU1JDIiAvdG1wL2Rhc2hib2FyZF9pbnN0YWxsLmh0bWwKCnNlZCAtaSAic3xyb3V0ZXI6W1s6c3BhY2U6XV0qJ2h0dHA6Ly8xOTIuMTY4LjEuMSd8cm91dGVyOiAgICAgICAgJ2h0dHA6Ly8kKGVzY2FwZV9zZWQgIiRST1VURVJfSVAiKSd8ZyIgL3RtcC9kYXNoYm9hcmRfaW5zdGFsbC5odG1sCnNlZCAtaSAic3xsdWNpX3JwYzpbWzpzcGFjZTpdXSonaHR0cDovLzE5Mi4xNjguMS4xL3VidXMnfGx1Y2lfcnBjOiAgICAgICdodHRwOi8vJChlc2NhcGVfc2VkICIkUk9VVEVSX0lQIikvdWJ1cyd8ZyIgL3RtcC9kYXNoYm9hcmRfaW5zdGFsbC5odG1sCnNlZCAtaSAic3xtaWhvbW9fYXBpOltbOnNwYWNlOl1dKidodHRwOi8vMTkyLjE2OC4xLjE6OTA5MCd8bWlob21vX2FwaTogICAgJ2h0dHA6Ly8kKGVzY2FwZV9zZWQgIiRST1VURVJfSVAiKToke01JSE9NT19QT1JUfSd8ZyIgL3RtcC9kYXNoYm9hcmRfaW5zdGFsbC5odG1sCnNlZCAtaSAic3xhZGd1YXJkX2hvc3Q6W1s6c3BhY2U6XV0qJzE5Mi4xNjguMS4xJ3xhZGd1YXJkX2hvc3Q6ICAnJChlc2NhcGVfc2VkICIkUk9VVEVSX0lQIiknfGciIC90bXAvZGFzaGJvYXJkX2luc3RhbGwuaHRtbAppZiBbICIkQURHX0VOQUJMRSIgPSAieSIgXSB8fCBbICIkQURHX0VOQUJMRSIgPSAiWSIgXTsgdGhlbgogIHNlZCAtaSAic3xhZGd1YXJkX3BvcnQ6W1s6c3BhY2U6XV0qMzAzMHxhZGd1YXJkX3BvcnQ6ICAke0FER19QT1JUfXxnIiAvdG1wL2Rhc2hib2FyZF9pbnN0YWxsLmh0bWwKICBzZWQgLWkgInN8YWRndWFyZF91c2VyOltbOnNwYWNlOl1dKidhZG1pbid8YWRndWFyZF91c2VyOiAgJyQoZXNjYXBlX3NlZCAiJEFER19VU0VSIiknfGciIC90bXAvZGFzaGJvYXJkX2luc3RhbGwuaHRtbApmaQpzZWQgLWkgInN8d2lmaV9hcDpbWzpzcGFjZTpdXSonJ3x3aWZpX2FwOiAgICAgICAgJyQoZXNjYXBlX3NlZCAiJFdJRklfQVAiKSd8ZyIgL3RtcC9kYXNoYm9hcmRfaW5zdGFsbC5odG1sCnNlZCAtaSAic3x3aWZpX2FwX3BvcnQ6W1s6c3BhY2U6XV0qJyd8d2lmaV9hcF9wb3J0OiAgICckKGVzY2FwZV9zZWQgIiRXSUZJX0FQX1BPUlQiKSd8ZyIgL3RtcC9kYXNoYm9hcmRfaW5zdGFsbC5odG1sCnNlZCAtaSAic3x3aWZpX2FwX2h0dHBzOltbOnNwYWNlOl1dKnRydWV8d2lmaV9hcF9odHRwczogICR7V0lGSV9BUF9IVFRQU318ZyIgL3RtcC9kYXNoYm9hcmRfaW5zdGFsbC5odG1sCnNlZCAtaSAic3xodHRwOi8vMTkyLjE2OC4xLjF8aHR0cDovLyQoZXNjYXBlX3NlZCAiJFJPVVRFUl9JUCIpfGciIC90bXAvZGFzaGJvYXJkX2luc3RhbGwuaHRtbAoKb2sgImRhc2hib2FyZC5odG1sIHBhdGNoZWQiCgojID09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PQojIDQuIEluc3RhbGwgZmlsZXMKIyA9PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT0KY3AgL3RtcC9kYXNoYm9hcmRfaW5zdGFsbC5odG1sICIkREFTSF9EU1QiCm9rICJJbnN0YWxsZWQgJERBU0hfRFNUIgoKY3AgIiRBQ0xfU1JDIiAiJEFDTF9EU1QiCm9rICJJbnN0YWxsZWQgJEFDTF9EU1QiCgpybSAtZiAvdG1wL2Rhc2hib2FyZF9pbnN0YWxsLmh0bWwKCiMgPT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09CiMgNS4gUmVzdGFydCBycGNkIHRvIGFwcGx5IEFDTAojID09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PQovZXRjL2luaXQuZC9ycGNkIHJlc3RhcnQgMj4vZGV2L251bGwgJiYgb2sgInJwY2QgcmVzdGFydGVkIiB8fCBpbmZvICJycGNkIHJlc3RhcnQgZmFpbGVkIOKAlCBydW46IC9ldGMvaW5pdC5kL3JwY2QgcmVzdGFydCIKCiMgPT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09CiMgNi4gRG9uZQojID09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PQplY2hvICIiCm9rICI9PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09IgpvayAiICBJbnN0YWxsYXRpb24gY29tcGxldGUhIgpvayAiPT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PSIKaW5mbyAiT3BlbjogaHR0cDovLyR7Uk9VVEVSX0lQfS9kYXNoYm9hcmQuaHRtbCIKZWNobyAiIgo=
+#!/bin/sh
+# ============================================================
+#  OpenWRT Dashboard — install.sh
+#  Works on OpenWRT 23.x / 24.x / 25.x (apk or opkg)
+#
+#  One-liner install (run directly on the router):
+#    wget -qO- https://raw.githubusercontent.com/Anilexis/openwrt-darkboard/main/install.sh | sh
+#
+#  Or download first, then run:
+#    wget https://raw.githubusercontent.com/Anilexis/openwrt-darkboard/main/install.sh
+#    sh install.sh
+# ============================================================
+set -e
+
+DASH_SRC="dashboard.html"
+DASH_DST="/www/dashboard.html"
+ACL_DST="/usr/share/rpcd/acl.d/dashboard.json"
+ACL_SRC="dashboard.json"
+REPO_URL="https://raw.githubusercontent.com/Anilexis/openwrt-darkboard/main"
+
+RED=$(printf '\033[0;31m')
+GRN=$(printf '\033[0;32m')
+YEL=$(printf '\033[1;33m')
+NC=$(printf '\033[0m')
+ok()  { printf "${GRN}[OK]${NC} %s\n" "$1"; }
+err() { printf "${RED}[ERR]${NC} %s\n" "$1"; exit 1; }
+ask() { printf "${YEL}?${NC} %s: " "$1"; read -r ans; echo "$ans"; }
+info(){ printf "${YEL}[i]${NC} %s\n" "$1"; }
+
+# ============================================================
+# 0. Detect package manager
+# ============================================================
+if command -v apk >/dev/null 2>&1; then
+  PKG_MGR="apk"
+elif command -v opkg >/dev/null 2>&1; then
+  PKG_MGR="opkg"
+else
+  err "Neither apk nor opkg found. Is this really OpenWRT?"
+fi
+ok "Package manager: $PKG_MGR"
+
+# ============================================================
+# 1. Collect settings
+# ============================================================
+echo ""
+info "========================================"
+info "  Dashboard setup — enter your settings "
+info "========================================"
+echo ""
+
+ROUTER_IP=$(ask "Router IP [default: 192.168.1.1]")
+[ -z "$ROUTER_IP" ] && ROUTER_IP="192.168.1.1"
+echo "$ROUTER_IP" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' || err "Invalid IP address: $ROUTER_IP"
+
+ADG_ENABLE=$(ask "Enable AdGuard Home integration? [y/N]")
+ADG_USER=""; ADG_PASS=""; ADG_PORT="3030"
+if [ "$ADG_ENABLE" = "y" ] || [ "$ADG_ENABLE" = "Y" ]; then
+  ADG_USER=$(ask "AdGuard admin username [default: admin]")
+  [ -z "$ADG_USER" ] && ADG_USER="admin"
+  ADG_PORT=$(ask "AdGuard port [default: 3030]")
+  [ -z "$ADG_PORT" ] && ADG_PORT="3030"
+fi
+
+WIFI_AP=$(ask "External WiFi AP IP (e.g. 192.168.1.100, leave empty to use local wireless or disable)")
+WIFI_AP_PORT=""
+WIFI_AP_HTTPS="true"
+if [ -n "$WIFI_AP" ]; then
+  WIFI_AP_PORT=$(ask "WiFi AP admin port (e.g. 8443 or 80, leave empty to hide link)")
+  _HTTPS=$(ask "Use HTTPS for AP admin link? (Y/n)")
+  [ "$_HTTPS" = "n" ] || [ "$_HTTPS" = "N" ] && WIFI_AP_HTTPS="false"
+fi
+
+MIHOMO_PORT=$(ask "Mihomo API port [default: 9090]")
+[ -z "$MIHOMO_PORT" ] && MIHOMO_PORT="9090"
+
+echo ""
+info "Settings:"
+info "  Router:         $ROUTER_IP"
+info "  Mihomo API:     $ROUTER_IP:$MIHOMO_PORT"
+info "  AdGuard:        ${ADG_ENABLE:-N} (port $ADG_PORT)"
+info "  WiFi AP:        ${WIFI_AP:-local/disabled}${WIFI_AP_PORT:+ :${WIFI_AP_PORT}}"
+echo ""
+
+CONFIRM=$(ask "Apply? [Y/n]")
+[ "$CONFIRM" = "n" ] || [ "$CONFIRM" = "N" ] && { info "Aborted."; exit 0; }
+
+# ============================================================
+# 2. Download files from GitHub (if not already present locally)
+# ============================================================
+if [ ! -f "$DASH_SRC" ] || [ ! -f "$ACL_SRC" ]; then
+  info "Local files not found — downloading from GitHub..."
+  wget -q -O "$DASH_SRC" "$REPO_URL/dashboard.html" || err "Failed to download dashboard.html"
+  wget -q -O "$ACL_SRC"  "$REPO_URL/dashboard.json" || err "Failed to download dashboard.json"
+  ok "Files downloaded successfully"
+else
+  ok "Using local files"
+fi
+
+# ============================================================
+# 3. Patch dashboard.html with user values
+# ============================================================
+# Helper: escape & and \ for use in sed replacement strings
+escape_sed(){ printf '%s' "$1" | sed 's/[&\\]/\\&/g'; }
+
+cp "$DASH_SRC" /tmp/dashboard_install.html
+
+sed -i "s|router:[[:space:]]*'http://192.168.1.1'|router:        'http://$(escape_sed "$ROUTER_IP")'|g" /tmp/dashboard_install.html
+sed -i "s|luci_rpc:[[:space:]]*'http://192.168.1.1/ubus'|luci_rpc:      'http://$(escape_sed "$ROUTER_IP")/ubus'|g" /tmp/dashboard_install.html
+sed -i "s|mihomo_api:[[:space:]]*'http://192.168.1.1:9090'|mihomo_api:    'http://$(escape_sed "$ROUTER_IP"):${MIHOMO_PORT}'|g" /tmp/dashboard_install.html
+sed -i "s|adguard_host:[[:space:]]*'192.168.1.1'|adguard_host:  '$(escape_sed "$ROUTER_IP")'|g" /tmp/dashboard_install.html
+if [ "$ADG_ENABLE" = "y" ] || [ "$ADG_ENABLE" = "Y" ]; then
+  sed -i "s|adguard_port:[[:space:]]*3030|adguard_port:  ${ADG_PORT}|g" /tmp/dashboard_install.html
+  sed -i "s|adguard_user:[[:space:]]*'admin'|adguard_user:  '$(escape_sed "$ADG_USER")'|g" /tmp/dashboard_install.html
+fi
+sed -i "s|wifi_ap:[[:space:]]*''|wifi_ap:        '$(escape_sed "$WIFI_AP")'|g" /tmp/dashboard_install.html
+sed -i "s|wifi_ap_port:[[:space:]]*''|wifi_ap_port:   '$(escape_sed "$WIFI_AP_PORT")'|g" /tmp/dashboard_install.html
+sed -i "s|wifi_ap_https:[[:space:]]*true|wifi_ap_https:  ${WIFI_AP_HTTPS}|g" /tmp/dashboard_install.html
+sed -i "s|http://192.168.1.1|http://$(escape_sed "$ROUTER_IP")|g" /tmp/dashboard_install.html
+
+ok "dashboard.html patched"
+
+# ============================================================
+# 4. Install files
+# ============================================================
+cp /tmp/dashboard_install.html "$DASH_DST"
+ok "Installed $DASH_DST"
+
+cp "$ACL_SRC" "$ACL_DST"
+ok "Installed $ACL_DST"
+
+rm -f /tmp/dashboard_install.html
+
+# ============================================================
+# 5. Restart rpcd to apply ACL
+# ============================================================
+/etc/init.d/rpcd restart 2>/dev/null && ok "rpcd restarted" || info "rpcd restart failed — run: /etc/init.d/rpcd restart"
+
+# ============================================================
+# 6. Done
+# ============================================================
+echo ""
+ok "========================================"
+ok "  Installation complete!"
+ok "========================================"
+info "Open: http://${ROUTER_IP}/dashboard.html"
+echo ""
