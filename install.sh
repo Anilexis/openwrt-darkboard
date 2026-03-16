@@ -1,5 +1,5 @@
 #!/bin/sh
-# OpenWRT Dashboard installer — fixed version
+# OpenWRT Dashboard installer
 set -e
 
 DASH_SRC="dashboard.html"
@@ -8,7 +8,6 @@ ACL_DST="/usr/share/rpcd/acl.d/dashboard.json"
 ACL_SRC="dashboard.json"
 REPO_URL="https://raw.githubusercontent.com/Anilexis/openwrt-darkboard/main"
 
-# FIX 7: ANSI colors via printf (not literal \\033)
 RED=$(printf '\033[0;31m')
 GRN=$(printf '\033[0;32m')
 YEL=$(printf '\033[1;33m')
@@ -20,7 +19,7 @@ ask()  { printf "${YEL}[?]${NC} %s " "$1"; read -r ans; echo "$ans"; }
 info() { printf "${YEL}[i]${NC} %s\n" "$1"; }
 TITLE(){ printf "\n${GRN}===  %s  ===${NC}\n" "$*"; }
 
-# FIX: sed escape helper — escapes & \ / for use in sed replacement strings
+# sed escape helper escapes & \ / for use in sed replacement strings
 escape_sed(){ printf '%s' "$1" | sed 's/[&\\/]/\\&/g'; }
 
 # ============================================================ detect package manager
@@ -33,13 +32,13 @@ ok "Package manager: $PKGMGR"
 # ============================================================ gather settings
 TITLE "Configuration"
 echo
-info "Dashboard setup — enter your settings"
+info "Dashboard setup - enter your settings"
 info ""
 
 ROUTER_IP=$(ask "Router IP [default: 192.168.1.1]:")
 [ -z "$ROUTER_IP" ] && ROUTER_IP="192.168.1.1"
 
-# FIX: validate IP format
+#validate IP format
 echo "$ROUTER_IP" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' \
   || err "Invalid IP address: $ROUTER_IP"
 
@@ -47,7 +46,7 @@ ADG_ENABLE=$(ask "Enable AdGuard Home integration? [y/N]:")
 ADG_USER="admin"
 ADG_PASS=""
 ADG_PORT="3003"
-# FIX 8: only ask AdGuard details if enabled
+#only ask AdGuard details if enabled
 if [ "$ADG_ENABLE" = "y" ] || [ "$ADG_ENABLE" = "Y" ]; then
   ADG_USER=$(ask "AdGuard admin username [default: admin]:")
   [ -z "$ADG_USER" ] && ADG_USER="admin"
@@ -88,7 +87,7 @@ CONFIRM=$(ask "Apply? [Y/n]:")
 # ============================================================ download files if needed
 TITLE "Files"
 if [ ! -f "$DASH_SRC" ] || [ ! -f "$ACL_SRC" ]; then
-  info "Local files not found — downloading from GitHub..."
+  info "Local files not found â€” downloading from GitHub..."
   wget -q -O "$DASH_SRC" "$REPO_URL/dashboard.html" || err "Failed to download dashboard.html"
   wget -q -O "$ACL_SRC"  "$REPO_URL/dashboard.json" || err "Failed to download dashboard.json"
   ok "Files downloaded"
@@ -100,7 +99,7 @@ fi
 TITLE "Patching"
 cp "$DASH_SRC" /tmp/dashboard-install.html
 
-# FIX: escape all user values before sed substitution
+# escape all user values before sed substitution
 E_ROUTER_IP=$(escape_sed "$ROUTER_IP")
 E_MIHOMO_PORT=$(escape_sed "$MIHOMO_PORT")
 E_ADG_PORT=$(escape_sed "$ADG_PORT")
@@ -117,7 +116,7 @@ sed -i "s|luci_rpc:\s*'http://192.168.1.1/ubus'|luci_rpc:      'http://${E_ROUTE
 sed -i "s|mihomo_api:\s*'http://192.168.1.1:9090'|mihomo_api:    'http://${E_ROUTER_IP}:${E_MIHOMO_PORT}'|g" /tmp/dashboard-install.html
 sed -i "s|adguard_host:\s*'192.168.1.1'|adguard_host:  '${E_ROUTER_IP}'|g"             /tmp/dashboard-install.html
 
-# FIX 8: only patch AdGuard credentials if enabled
+# only patch AdGuard credentials if enabled
 if [ "$ADG_ENABLE" = "y" ] || [ "$ADG_ENABLE" = "Y" ]; then
   sed -i "s|adguard_port:\s*3003,|adguard_port:  ${E_ADG_PORT},|g"                     /tmp/dashboard-install.html
   sed -i "s|adguard_user:\s*'admin'|adguard_user:  '${E_ADG_USER}'|g"                  /tmp/dashboard-install.html
@@ -148,7 +147,7 @@ rm -f /tmp/dashboard-install.html
 # ============================================================ restart rpcd
 TITLE "Restarting rpcd"
 /etc/init.d/rpcd restart 2>/dev/null && ok "rpcd restarted" \
-  || info "rpcd restart failed — run: /etc/init.d/rpcd restart"
+  || info "rpcd restart failed â€” run: /etc/init.d/rpcd restart"
 
 # ============================================================ done
 TITLE "Done"
