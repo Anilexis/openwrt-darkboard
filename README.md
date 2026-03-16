@@ -23,6 +23,7 @@ A single-file, real-time monitoring dashboard for OpenWRT routers. No Node.js, n
 | **Topbar** | Hostname, kernel, firmware, uptime, CPU temp, WAN traffic counter, clock |
 
 **Responsive:** 4-column desktop grid → 2-column tablet → 1–2-column mobile, PWA-ready (add to home screen).
+Passwords are stored locally in the browser (LocalStorage). Use the dashboard only on trusted devices!
 
 ---
 
@@ -96,6 +97,7 @@ MIT
 ![Картинка](https://raw.githubusercontent.com/Anilexis/openwrt-darkboard/main/preview.png)
 
 Дашборд для мониторинга роутера на OpenWRT в реальном времени. Один файл `dashboard.html` — без Node.js, без сборки, без бэкенда.
+Пароли хранятся локально в браузере (LocalStorage). Используйте дашборд только на доверенных устройствах!
 
 ## Возможности
 
@@ -135,8 +137,6 @@ wget -qO- https://raw.githubusercontent.com/Anilexis/openwrt-darkboard/main/inst
 
 Установщик интерактивно спросит:
 - IP роутера
-- Пароль LuCI/root
-- Секрет Mihomo API
 - Данные AdGuard Home
 - IP внешней WiFi AP (опционально)
 

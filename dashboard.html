@@ -369,6 +369,8 @@ hr{border:none;border-top:1px solid var(--border);margin:2px 0;}
       </span>
     </div>
     <div class="tb-r">
+      <span style="cursor:pointer; color:var(--text-faint)" onclick="clear_creds()" title="Reset credentials">⍈</span>
+      <span class="tb-sep">|</span>
       <span>uptime <span id="tb-up" class="tb-uptime">--:--:--</span></span>
       <span class="tb-sep">|</span>
       <span id="tb-temp" style="color:var(--green)">--</span>
@@ -516,6 +518,37 @@ const C = {
   clients: 10000,
   wifi:   15000,
 };
+// Loading passwords from LocalStorage
+const savedCreds = localStorage.getItem('darkboard_creds');
+if (savedCreds) {
+  const s = JSON.parse(savedCreds);
+  C.luci_pass = s.luci_pass || '';
+  C.mihomo_secret = s.mihomo_secret || '';
+  C.adguard_pass = s.adguard_pass || '';
+} else {
+  // If there are no passwords (first login), we request them from the user
+  C.luci_pass = prompt('Enter root password (LuCI):') || '';
+  
+if (confirm('Enter passwords for Mihomo and AdGuard? (Cancel if none)')) {
+    C.mihomo_secret = prompt('Secret for Mihomo API:') || '';
+    C.adguard_pass = prompt('Password for AdGuard Home:') || '';
+  }
+  
+  // Save in browser forever
+  localStorage.setItem('darkboard_creds', JSON.stringify({
+    luci_pass: C.luci_pass,
+    mihomo_secret: C.mihomo_secret,
+    adguard_pass: C.adguard_pass
+  }));
+}
+
+// Password reset function
+function clear_creds() {
+  if (confirm('Are you sure you want to delete saved passwords from your browser?')) {
+    localStorage.removeItem('darkboard_creds');
+    location.reload();
+  }
+}
 
 // ===== STATE =====
 let tok = null, pCPU = null, pNet = {};
@@ -560,7 +593,12 @@ async function luci_call(obj,method,args){
       params:[tok||'0'.repeat(32),obj,method,args||{}]}),
     signal:AbortSignal.timeout(5000)
   });
-  const j=await res.json(); return j.result;
+  const j=await res.json();
+  if(j.result?.[0]===6){ // session expired — re-login and retry once
+    await luci_login();
+    return luci_call(obj,method,args);
+  }
+  return j.result;
 }
 async function luci_login(){
   const res=await fetch(C.luci_rpc,{
@@ -640,13 +678,11 @@ async function update_cpu(){
           const dt=du+dn+ds+di+dw+dr+dsi;
           const p=dt>0?Math.round((1-di/dt)*100):0;
           const b=$('cpu-bdg'); b.textContent=p+'%'; b.className='badge '+(p>80?'b-err':p>50?'b-warn':'b-ok');
+          // realtime API returns aggregate CPU only — per-core data not available here.
+          // Individual cores are updated accurately only via procstat branch.
+          // We only update the shared max tracker so it isn't reset to 0.
           for(let i=0;i<numCores;i++){
             if(p>maxCPU[i]) maxCPU[i]=p;
-            const f=$('cc'+i),v=$('cv'+i),mx=$('cm'+i),mv=$('cmv'+i);
-            if(f){f.style.height=p+'%';f.style.background=p>80?'var(--red)':p>50?'var(--yellow)':'var(--green)';}
-            if(v){v.textContent=p+'%';v.style.color=p>80?'var(--red)':p>50?'var(--yellow)':'var(--green)';}
-            if(mx){mx.style.bottom=maxCPU[i]+'%';mx.title='max '+maxCPU[i]+'%';}
-            if(mv) mv.textContent=maxCPU[i]+'%';
           }
           return;
         }
@@ -901,6 +937,7 @@ async function update_net(){
   }
   $('net-p').innerHTML=html||'<div class="met"><span class="ml muted">no interfaces</span></div>';
   $('ct-bdg').textContent='ct: '+($('ct-act').textContent||'--');
+  for (const k in pNet) if (!devs[k]) delete pNet[k];
 }
 
 // ===== CONNTRACK =====
@@ -971,6 +1008,7 @@ async function mihomo_delay(proxyName,testUrl){
   }catch(e){return null;}
 }
 async function update_ping(){
+  latD={};  // reset stale proxy keys before each poll
   const tasks=[];
   for(const g of LAT_GROUPS) for(const t of LAT_TARGETS) tasks.push({key:g.name+'|'+t.label,group:g.name,url:t.url});
   const results=await Promise.allSettled(tasks.map(async t=>({key:t.key,ms:await mihomo_delay(t.group,t.url)})));
@@ -1076,7 +1114,7 @@ async function render_logs(name){
 // ===== SERVICES =====
 // All known popular services — only installed ones will be shown (see update_services)
 const SVC_DAEMON=[
-  // Базовые системные
+  // Basic system
   {name:'uhttpd',            label:'LuCI (uhttpd)'},
   {name:'network',           label:'Network'},
   {name:'dnsmasq',           label:'dnsmasq'},
@@ -1087,7 +1125,7 @@ const SVC_DAEMON=[
   {name:'mwan3',             label:'mwan3'},
   {name:'watchcat',          label:'Watchcat'},
   {name:'ttyd',              label:'Web Terminal'},
-  // Обход блокировок и Прокси
+  // Proxy and dpi
   {name:'zapret',            label:'zapret (DPI Bypass)'},
   {name:'podkop',            label:'Podkop (Routing)'},
   {name:'byedpi',            label:'ByeDPI'},
@@ -1105,7 +1143,7 @@ const SVC_DAEMON=[
   {name:'tor',               label:'Tor Daemon'},
   {name:'i2pd',              label:'I2P Router (i2pd)'},
   {name:'tun2socks',         label:'tun2socks'},
-  // VPN и Mesh-сети
+  // VPN and Mesh
   {name:'openvpn',           label:'OpenVPN'},
   {name:'wireguard',         label:'WireGuard'},
   {name:'amneziawg',         label:'AmneziaWG'},
@@ -1115,13 +1153,13 @@ const SVC_DAEMON=[
   {name:'zerotier',          label:'ZeroTier'},
   {name:'netbird',           label:'Netbird'},
   {name:'openconnect',       label:'OpenConnect'},
-  // DNS и Блокировщики
+  // DNS and adblock
   {name:'adguardhome',       label:'AdGuard Home'},
   {name:'adblock',           label:'adblock'},
   {name:'banip',             label:'banIP'},
   {name:'unbound',           label:'Unbound'},
   {name:'stubby',            label:'Stubby (DoT)'},
-  // Docker, NAS и Файлы
+  // Docker, NAS and Files
   {name:'dockerd',           label:'Docker Engine'},
   {name:'samba4',            label:'Samba 4'},
   {name:'ksmbd',             label:'Kernel SMB'},
@@ -1134,7 +1172,7 @@ const SVC_DAEMON=[
   {name:'vsftpd',            label:'FTP (vsftpd)'},
   {name:'p910nd',            label:'Print Server'},
   {name:'cupsd',             label:'CUPS Print Server'},
-  // Сеть, Мониторинг, IoT и Телефония
+  // Network, Monitoring, IoT and Telephony
   {name:'miniupnpd',         label:'UPnP'},
   {name:'vnstat',            label:'vnStat'},
   {name:'smartd',            label:'S.M.A.R.T. Monitor'},
@@ -1152,8 +1190,6 @@ const SVC_ONESHOT=[
   {name:'firewall',label:'firewall'},
   {name:'sqm',     label:'SQM/CAKE'},
   {name:'nft-qos', label:'nft-QoS'},
-  {name:'banip',   label:'banIP'},
-  {name:'adblock', label:'adblock'},
 ];
 async function update_services(){
   if(currentLogSvc){ await render_logs(currentLogSvc); return; }
@@ -1225,7 +1261,9 @@ async function update_mihomo(){
 
 // ===== ADGUARD =====
 async function agh_api(endpoint){
-  const r=await file_exec('/usr/bin/curl',['-s','-m','3','-u',C.adguard_user+':'+C.adguard_pass,'http://'+C.adguard_host+':'+C.adguard_port+endpoint]);
+  const creds = C.adguard_pass.includes(':') ? C.adguard_pass : C.adguard_user + ':' + C.adguard_pass;
+  const b64 = btoa(creds);
+  const r=await file_exec('/usr/bin/curl',['-s','-m','3','-H','Authorization: Basic '+b64, 'http://'+C.adguard_host+':'+C.adguard_port+endpoint]);
   const out=r.stdout?.trim(); if(!out) return null;
   try{return JSON.parse(out);}catch(e){return null;}
 }
@@ -1241,7 +1279,8 @@ async function update_adguard(){
       html+=`<div class="ds"><span class="dl">avg latency</span><span class="dv">${s.avg_processing_time?((s.avg_processing_time*1000).toFixed(1)+'ms'):'--'}</span></div>`;
       if(s.top_blocked_domains?.length){
         html+='<hr>';
-        for(const[d,c]of s.top_blocked_domains.slice(0,3)){
+        for(const item of s.top_blocked_domains.slice(0,3)){
+          const d=item.name, c=item.count;
           html+=`<div class="ds"><span class="dl" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:70%">${d}</span><span class="dv warn">${c}</span></div>`;
         }
       }
@@ -1371,8 +1410,9 @@ async function update_wifi_ap(){
   if(ap){
     let reachable = false;
     try{
-      const r = await file_exec('/bin/ping',['-c','1','-W','2',ap]);
-      if((r.stdout||'').includes('0% packet loss')||(r.stdout||'').includes('1 received')) reachable=true;
+      let r = await file_exec('/bin/ping',['-c','1','-W','2',ap]);
+      if(!r?.stdout) r = await file_exec('/usr/bin/ping',['-c','1','-W','2',ap]);
+      if((r?.stdout||'').includes('0% packet loss')||(r?.stdout||'').includes('1 received')) reachable=true;
     }catch(e){}
     if(!reachable){
       try{
@@ -1437,7 +1477,7 @@ async function _wifi_local_radios(fullMode){
   let ifaces = [];
   try{
     const r = await file_exec('/usr/bin/iwinfo',['--version']);
-    if(r && (r.stdout||r.stderr)){
+    if(r && r.code===0){
       // iwinfo available — get interface list from /sys/class/net
       const sysnet = await file_read('/proc/net/dev');
       if(sysnet){

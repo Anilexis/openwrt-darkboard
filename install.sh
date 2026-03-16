@@ -18,7 +18,10 @@ ACL_DST="/usr/share/rpcd/acl.d/dashboard.json"
 ACL_SRC="dashboard.json"
 REPO_URL="https://raw.githubusercontent.com/Anilexis/openwrt-darkboard/main"
 
-RED='\033[0;31m'; GRN='\033[0;32m'; YEL='\033[1;33m'; NC='\033[0m'
+RED=$(printf '\033[0;31m')
+GRN=$(printf '\033[0;32m')
+YEL=$(printf '\033[1;33m')
+NC=$(printf '\033[0m')
 ok()  { printf "${GRN}[OK]${NC} %s\n" "$1"; }
 err() { printf "${RED}[ERR]${NC} %s\n" "$1"; exit 1; }
 ask() { printf "${YEL}?${NC} %s: " "$1"; read -r ans; echo "$ans"; }
@@ -47,17 +50,13 @@ echo ""
 
 ROUTER_IP=$(ask "Router IP [default: 192.168.1.1]")
 [ -z "$ROUTER_IP" ] && ROUTER_IP="192.168.1.1"
-
-LUCI_PASS=$(ask "LuCI/root password (leave empty if none)")
-
-MIHOMO_SECRET=$(ask "Mihomo external-controller secret (leave empty if none)")
+echo "$ROUTER_IP" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' || err "Invalid IP address: $ROUTER_IP"
 
 ADG_ENABLE=$(ask "Enable AdGuard Home integration? [y/N]")
 ADG_USER=""; ADG_PASS=""; ADG_PORT="3030"
 if [ "$ADG_ENABLE" = "y" ] || [ "$ADG_ENABLE" = "Y" ]; then
   ADG_USER=$(ask "AdGuard admin username [default: admin]")
   [ -z "$ADG_USER" ] && ADG_USER="admin"
-  ADG_PASS=$(ask "AdGuard admin password (leave empty if none)")
   ADG_PORT=$(ask "AdGuard port [default: 3030]")
   [ -z "$ADG_PORT" ] && ADG_PORT="3030"
 fi
@@ -100,21 +99,23 @@ fi
 # ============================================================
 # 3. Patch dashboard.html with user values
 # ============================================================
+# Helper: escape & and \ for use in sed replacement strings
+escape_sed(){ printf '%s' "$1" | sed 's/[&\\]/\\&/g'; }
+
 cp "$DASH_SRC" /tmp/dashboard_install.html
 
-sed -i "s|router:[[:space:]]*'http://192.168.1.1'|router:        'http://${ROUTER_IP}'|g" /tmp/dashboard_install.html
-sed -i "s|luci_rpc:[[:space:]]*'http://192.168.1.1/ubus'|luci_rpc:      'http://${ROUTER_IP}/ubus'|g" /tmp/dashboard_install.html
-sed -i "s|luci_pass:[[:space:]]*''|luci_pass:     '${LUCI_PASS}'|g" /tmp/dashboard_install.html
-sed -i "s|mihomo_api:[[:space:]]*'http://192.168.1.1:9090'|mihomo_api:    'http://${ROUTER_IP}:${MIHOMO_PORT}'|g" /tmp/dashboard_install.html
-sed -i "s|mihomo_secret:[[:space:]]*''|mihomo_secret: '${MIHOMO_SECRET}'|g" /tmp/dashboard_install.html
-sed -i "s|adguard_host:[[:space:]]*'192.168.1.1'|adguard_host:  '${ROUTER_IP}'|g" /tmp/dashboard_install.html
-sed -i "s|adguard_port:[[:space:]]*3030|adguard_port:  ${ADG_PORT}|g" /tmp/dashboard_install.html
-sed -i "s|adguard_user:[[:space:]]*'admin'|adguard_user:  '${ADG_USER}'|g" /tmp/dashboard_install.html
-sed -i "s|adguard_pass:[[:space:]]*''|adguard_pass:  '${ADG_PASS}'|g" /tmp/dashboard_install.html
-sed -i "s|wifi_ap:[[:space:]]*''|wifi_ap:        '${WIFI_AP}'|g" /tmp/dashboard_install.html
-sed -i "s|wifi_ap_port:[[:space:]]*''|wifi_ap_port:   '${WIFI_AP_PORT}'|g" /tmp/dashboard_install.html
+sed -i "s|router:[[:space:]]*'http://192.168.1.1'|router:        'http://$(escape_sed "$ROUTER_IP")'|g" /tmp/dashboard_install.html
+sed -i "s|luci_rpc:[[:space:]]*'http://192.168.1.1/ubus'|luci_rpc:      'http://$(escape_sed "$ROUTER_IP")/ubus'|g" /tmp/dashboard_install.html
+sed -i "s|mihomo_api:[[:space:]]*'http://192.168.1.1:9090'|mihomo_api:    'http://$(escape_sed "$ROUTER_IP"):${MIHOMO_PORT}'|g" /tmp/dashboard_install.html
+sed -i "s|adguard_host:[[:space:]]*'192.168.1.1'|adguard_host:  '$(escape_sed "$ROUTER_IP")'|g" /tmp/dashboard_install.html
+if [ "$ADG_ENABLE" = "y" ] || [ "$ADG_ENABLE" = "Y" ]; then
+  sed -i "s|adguard_port:[[:space:]]*3030|adguard_port:  ${ADG_PORT}|g" /tmp/dashboard_install.html
+  sed -i "s|adguard_user:[[:space:]]*'admin'|adguard_user:  '$(escape_sed "$ADG_USER")'|g" /tmp/dashboard_install.html
+fi
+sed -i "s|wifi_ap:[[:space:]]*''|wifi_ap:        '$(escape_sed "$WIFI_AP")'|g" /tmp/dashboard_install.html
+sed -i "s|wifi_ap_port:[[:space:]]*''|wifi_ap_port:   '$(escape_sed "$WIFI_AP_PORT")'|g" /tmp/dashboard_install.html
 sed -i "s|wifi_ap_https:[[:space:]]*true|wifi_ap_https:  ${WIFI_AP_HTTPS}|g" /tmp/dashboard_install.html
-sed -i "s|http://192.168.1.1|http://${ROUTER_IP}|g" /tmp/dashboard_install.html
+sed -i "s|http://192.168.1.1|http://$(escape_sed "$ROUTER_IP")|g" /tmp/dashboard_install.html
 
 ok "dashboard.html patched"
 
