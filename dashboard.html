@@ -1423,7 +1423,7 @@ async function render_logs(name) {
     }
     // Sort chronologically (syslog lines start with date) and keep last 25
     lines.sort();
-    if (lines.length > 25) lines = lines.slice(-25);
+    if (lines.length > 20) lines = lines.slice(-20);
     const lh = lines.length
       ? lines.map(l => `<div class="log-line">${l.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>`).join('')
       : '<div class="log-line" style="color:var(--text-faint)">no recent logs found</div>';
