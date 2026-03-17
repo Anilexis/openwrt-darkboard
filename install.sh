@@ -1,5 +1,6 @@
 #!/bin/sh
-# OpenWRT Dashboard installer
+# DarkBoard installer for OpenWRT
+# Usage: wget -qO- https://raw.githubusercontent.com/Anilexis/openwrt-darkboard/main/install.sh | sh
 set -e
 
 DASH_SRC="dashboard.html"
@@ -11,18 +12,19 @@ REPO_URL="https://raw.githubusercontent.com/Anilexis/openwrt-darkboard/main"
 RED=$(printf '\033[0;31m')
 GRN=$(printf '\033[0;32m')
 YEL=$(printf '\033[1;33m')
+CYN=$(printf '\033[0;36m')
 NC=$(printf '\033[0m')
 
-ok() { printf "${GRN}[OK]${NC} %s\n" "$1"; }
-err() { printf "${RED}[ERR]${NC} %s\n" "$1"; exit 1; }
-ask() { printf "${YEL}[?]${NC} %s " "$2" >&2; read -r "$1" < /dev/tty; }
+ok()   { printf "${GRN}[OK]${NC} %s\n" "$1"; }
+err()  { printf "${RED}[ERR]${NC} %s\n" "$1"; exit 1; }
+ask()  { printf "${YEL}[?]${NC} %s " "$2" >&2; read -r "$1" < /dev/tty; }
 info() { printf "${YEL}[i]${NC} %s\n" "$1"; }
 TITLE(){ printf "\n${GRN}=== %s ===${NC}\n" "$*"; }
 
-# sed escape helper escapes & \ / for use in sed replacement strings
-escape_sed(){ printf '%s' "$1" | sed 's/[&\\/]/\\&/g'; }
+# sed escape helper (escapes & \ / | for use in sed with | delimiter)
+escape_sed(){ printf '%s' "$1" | sed 's/[&\\/|]/\\&/g'; }
 
-# ============================================================ detect package manager
+# ============================================================ detect system
 TITLE "Checking system"
 if command -v apk >/dev/null 2>&1; then PKGMGR="apk"
 elif command -v opkg >/dev/null 2>&1; then PKGMGR="opkg"
@@ -32,107 +34,156 @@ ok "Package manager: $PKGMGR"
 # ============================================================ gather settings
 TITLE "Configuration"
 echo
-info "Dashboard setup - enter your settings"
-info ""
+info "DarkBoard setup - enter your settings (press Enter to accept defaults)"
+echo
 
+# --- Router ---
 ask ROUTER_IP "Router IP [default: 192.168.1.1]:"
 [ -z "$ROUTER_IP" ] && ROUTER_IP="192.168.1.1"
-
-#validate IP format
 echo "$ROUTER_IP" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' \
-|| err "Invalid IP address: $ROUTER_IP"
+  || err "Invalid IP address: $ROUTER_IP"
 
-ask ADG_ENABLE "Enable AdGuard Home integration? [y/N]:"
-ADG_USER="admin"
-ADG_PASS=""
-ADG_PORT="3003"
-#only ask AdGuard details if enabled
-if [ "$ADG_ENABLE" = "y" ] || [ "$ADG_ENABLE" = "Y" ]; then
-ask ADG_USER "AdGuard admin username [default: admin]:"
-[ -z "$ADG_USER" ] && ADG_USER="admin"
-ask ADG_PASS "AdGuard admin password:"
-ask ADG_PORT "AdGuard port [default: 3003]:"
-[ -z "$ADG_PORT" ] && ADG_PORT="3003"
-fi
-
-ask WIFI_AP "External WiFi AP IP (e.g. 192.168.1.4), leave empty to disable:"
-WIFI_AP_USER="admin"
-WIFI_AP_PASS=""
-WIFI_AP_PORT="80"
-WIFI_AP_HTTPS="false"
-if [ -n "$WIFI_AP" ]; then
-ask WIFI_AP_USER "WiFi AP admin username [default: admin]:"
-[ -z "$WIFI_AP_USER" ] && WIFI_AP_USER="admin"
-ask WIFI_AP_PASS "WiFi AP admin password (leave empty to be prompted at dashboard open):"
-ask WIFI_AP_PORT "WiFi AP admin port [default: 80]:"
-[ -z "$WIFI_AP_PORT" ] && WIFI_AP_PORT="80"
-ask HTTPS "Use HTTPS for AP admin link? [y/N]:"
-[ "$HTTPS" = "y" ] || [ "$HTTPS" = "Y" ] && WIFI_AP_HTTPS="true" || WIFI_AP_HTTPS="false"
-fi
-
+# --- Mihomo ---
 ask MIHOMO_PORT "Mihomo API port [default: 9090]:"
 [ -z "$MIHOMO_PORT" ] && MIHOMO_PORT="9090"
 
+# --- AdGuard Home ---
+ask ADG_ENABLE "Enable AdGuard Home integration? [y/N]:"
+ADG_PORT="3003"
+if [ "$ADG_ENABLE" = "y" ] || [ "$ADG_ENABLE" = "Y" ]; then
+  ask ADG_PORT "AdGuard port [default: 3003]:"
+  [ -z "$ADG_PORT" ] && ADG_PORT="3003"
+fi
+
+# --- WiFi AP ---
+ask WIFI_AP "External WiFi AP IP (e.g. 192.168.1.4), leave empty to disable:"
+WIFI_AP_PORT="80"
+WIFI_AP_HTTPS="false"
+if [ -n "$WIFI_AP" ]; then
+  ask WIFI_AP_PORT "WiFi AP admin port [default: 80]:"
+  [ -z "$WIFI_AP_PORT" ] && WIFI_AP_PORT="80"
+  ask HTTPS "Use HTTPS for AP admin link? [y/N]:"
+  if [ "$HTTPS" = "y" ] || [ "$HTTPS" = "Y" ]; then
+    WIFI_AP_HTTPS="true"
+  else
+    WIFI_AP_HTTPS="false"
+  fi
+fi
+
+# --- Wired clients ---
+echo
+info "Client mapping: define wired clients for correct icons in CLIENTS panel."
+info "Format: IP:TYPE:IFACE (type = pc|tv|ap, iface = ethN)"
+info "Example: 192.168.1.2:pc:eth2"
+info "Press Enter on empty line when done. Leave all empty to keep defaults."
+echo
+
+CLIENT_ENTRIES=""
+while true; do
+  ask CL_ENTRY "Client entry (or empty to finish):"
+  [ -z "$CL_ENTRY" ] && break
+  # Validate format
+  echo "$CL_ENTRY" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+:(pc|tv|ap):(eth[0-9]+)$' || {
+    info "Invalid format: $CL_ENTRY (expected IP:TYPE:IFACE, e.g. 192.168.1.2:pc:eth2)"
+    continue
+  }
+  CLIENT_ENTRIES="${CLIENT_ENTRIES}${CL_ENTRY}
+"
+done
+
+# ============================================================ summary
 echo
 info "Settings:"
-info " Router: $ROUTER_IP"
-info " Mihomo: $ROUTER_IP:$MIHOMO_PORT"
-info " AdGuard: ${ADG_ENABLE:-N} port=$ADG_PORT"
-info " WiFi AP: ${WIFI_AP:-disabled} port=$WIFI_AP_PORT https=$WIFI_AP_HTTPS"
+info "  Router:    $ROUTER_IP"
+info "  Mihomo:    $ROUTER_IP:$MIHOMO_PORT"
+info "  AdGuard:   ${ADG_ENABLE:-N} port=$ADG_PORT"
+info "  WiFi AP:   ${WIFI_AP:-disabled} port=$WIFI_AP_PORT https=$WIFI_AP_HTTPS"
+info "  Passwords are configured in the browser on first launch."
+if [ -n "$CLIENT_ENTRIES" ]; then
+  info "  Clients:"
+  printf '%s' "$CLIENT_ENTRIES" | while IFS= read -r line; do
+    [ -n "$line" ] && info "    $line"
+  done
+fi
 echo
 
 ask CONFIRM "Apply? [Y/n]:"
 [ "$CONFIRM" = "n" ] || [ "$CONFIRM" = "N" ] && { info "Aborted."; exit 0; }
 
-# ============================================================ download files if needed
-TITLE "Files"
-if [ ! -f "$DASH_SRC" ] || [ ! -f "$ACL_SRC" ]; then
-info "Local files not found — downloading from GitHub..."
+# ============================================================ download files from GitHub
+TITLE "Downloading from GitHub"
 wget -q -O "$DASH_SRC" "$REPO_URL/dashboard.html" || err "Failed to download dashboard.html"
-wget -q -O "$ACL_SRC" "$REPO_URL/dashboard.json" || err "Failed to download dashboard.json"
+wget -q -O "$ACL_SRC" "$REPO_URL/dashboard.json"  || err "Failed to download dashboard.json"
 ok "Files downloaded"
-else
-ok "Using local files"
-fi
 
 # ============================================================ patch
 TITLE "Patching"
 cp "$DASH_SRC" /tmp/dashboard-install.html
 
-# escape all user values before sed substitution
+# Escape all user values for sed
 E_ROUTER_IP=$(escape_sed "$ROUTER_IP")
 E_MIHOMO_PORT=$(escape_sed "$MIHOMO_PORT")
 E_ADG_PORT=$(escape_sed "$ADG_PORT")
-E_ADG_USER=$(escape_sed "$ADG_USER")
-E_ADG_PASS=$(escape_sed "$ADG_PASS")
 E_WIFI_AP=$(escape_sed "$WIFI_AP")
-E_WIFI_AP_USER=$(escape_sed "$WIFI_AP_USER")
-E_WIFI_AP_PASS=$(escape_sed "$WIFI_AP_PASS")
 E_WIFI_AP_PORT=$(escape_sed "$WIFI_AP_PORT")
 
-# Patch config values
-sed -i "s|router:\s*'http://192.168.1.1'|router: 'http://${E_ROUTER_IP}'|g" /tmp/dashboard-install.html
-sed -i "s|luci_rpc:\s*'http://192.168.1.1/ubus'|luci_rpc: 'http://${E_ROUTER_IP}/ubus'|g" /tmp/dashboard-install.html
+# Patch DEFAULTS block
+sed -i "s|router_ip:\s*'192.168.1.1'|router_ip: '${E_ROUTER_IP}'|g" /tmp/dashboard-install.html
+
+# Patch derived URLs
+sed -i "s|'http://192.168.1.1'|'http://${E_ROUTER_IP}'|g" /tmp/dashboard-install.html
+sed -i "s|'http://192.168.1.1/ubus'|'http://${E_ROUTER_IP}/ubus'|g" /tmp/dashboard-install.html
 sed -i "s|mihomo_api:\s*'http://192.168.1.1:9090'|mihomo_api: 'http://${E_ROUTER_IP}:${E_MIHOMO_PORT}'|g" /tmp/dashboard-install.html
 sed -i "s|adguard_host:\s*'192.168.1.1'|adguard_host: '${E_ROUTER_IP}'|g" /tmp/dashboard-install.html
 
-# only patch AdGuard credentials if enabled
+# Mihomo port
+sed -i "s|mihomo_port:\s*9090|mihomo_port: ${E_MIHOMO_PORT}|g" /tmp/dashboard-install.html
+
+# AdGuard port (only if enabled)
 if [ "$ADG_ENABLE" = "y" ] || [ "$ADG_ENABLE" = "Y" ]; then
-sed -i "s|adguard_port:\s*3003,|adguard_port: ${E_ADG_PORT},|g" /tmp/dashboard-install.html
-sed -i "s|adguard_user:\s*'admin'|adguard_user: '${E_ADG_USER}'|g" /tmp/dashboard-install.html
-sed -i "s|adguard_pass:\s*''|adguard_pass: '${E_ADG_PASS}'|g" /tmp/dashboard-install.html
+  sed -i "s|adguard_port:\s*3003,|adguard_port: ${E_ADG_PORT},|g" /tmp/dashboard-install.html
 fi
 
+# WiFi AP
 if [ -n "$WIFI_AP" ]; then
-sed -i "s|wifi_ap:\s*''|wifi_ap: '${E_WIFI_AP}'|g" /tmp/dashboard-install.html
-sed -i "s|wifi_ap_user:\s*'admin'|wifi_ap_user: '${E_WIFI_AP_USER}'|g" /tmp/dashboard-install.html
-sed -i "s|wifi_ap_pass:\s*''|wifi_ap_pass: '${E_WIFI_AP_PASS}'|g" /tmp/dashboard-install.html
-sed -i "s|wifi_ap_port:\s*80,|wifi_ap_port: ${E_WIFI_AP_PORT},|g" /tmp/dashboard-install.html
-sed -i "s|wifi_ap_https:\s*false|wifi_ap_https: ${WIFI_AP_HTTPS}|g" /tmp/dashboard-install.html
+  sed -i "s|wifi_ap_ip:\s*'192.168.1.4'|wifi_ap_ip: '${E_WIFI_AP}'|g" /tmp/dashboard-install.html
+  sed -i "s|wifi_ap_port:\s*80,|wifi_ap_port: ${E_WIFI_AP_PORT},|g" /tmp/dashboard-install.html
+  sed -i "s|wifi_ap_https:\s*false|wifi_ap_https: ${WIFI_AP_HTTPS}|g" /tmp/dashboard-install.html
 fi
 
-# Patch http://192.168.1.1 references for luci_pass
-sed -i "s|'http://192.168.1.1'|'http://${E_ROUTER_IP}'|g" /tmp/dashboard-install.html
+# Passwords (luci_pass, mihomo_secret, adguard_pass) are NOT patched here.
+# The user enters them in the browser modal on first launch (stored in localStorage).
+
+# Patch CLIENT_MAP if user provided entries
+if [ -n "$CLIENT_ENTRIES" ]; then
+  # Build a JS object string from entries
+  JS_MAP="{"
+  FIRST=1
+  printf '%s' "$CLIENT_ENTRIES" | while IFS=: read -r cip ctype ciface; do
+    [ -z "$cip" ] && continue
+    if [ "$FIRST" = "1" ]; then
+      FIRST=0
+    fi
+    printf "  '%s': { type: '%s', iface: '%s' },\n" "$cip" "$ctype" "$ciface"
+  done > /tmp/_darkboard_clients.js
+
+  if [ -s /tmp/_darkboard_clients.js ]; then
+    # Build the replacement block
+    REPLACEMENT="const CLIENT_MAP = {\n"
+    while IFS= read -r line; do
+      REPLACEMENT="${REPLACEMENT}${line}\n"
+    done < /tmp/_darkboard_clients.js
+    REPLACEMENT="${REPLACEMENT}};"
+
+    # Escape for sed
+    E_REPLACEMENT=$(printf '%s' "$REPLACEMENT" | sed ':a;N;$!ba;s/\n/\\n/g;s/[&/]/\\&/g')
+
+    # Replace the entire CLIENT_MAP block
+    sed -i "/^const CLIENT_MAP = {/,/^};/c\\${E_REPLACEMENT}" /tmp/dashboard-install.html
+    rm -f /tmp/_darkboard_clients.js
+    ok "CLIENT_MAP patched with custom entries"
+  fi
+fi
 
 ok "dashboard.html patched"
 
@@ -147,7 +198,7 @@ rm -f /tmp/dashboard-install.html
 # ============================================================ restart rpcd
 TITLE "Restarting rpcd"
 /etc/init.d/rpcd restart 2>/dev/null && ok "rpcd restarted" \
-|| info "rpcd restart failed — run: /etc/init.d/rpcd restart"
+  || info "rpcd restart failed - run: /etc/init.d/rpcd restart"
 
 # ============================================================ done
 TITLE "Done"

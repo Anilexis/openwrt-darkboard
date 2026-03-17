@@ -81,10 +81,6 @@
         "/tmp/dhcp.leases": [
           "read"
         ],
-        "/tmp/.asus_tok": [
-          "read",
-          "write"
-        ],
         "/sys/class/thermal/thermal_zone*/temp": [
           "read"
         ],

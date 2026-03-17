@@ -16,7 +16,7 @@ A single-file, real-time monitoring dashboard for OpenWRT routers. No Node.js, n
 | **Interfaces** | RX/TX rates with traffic-intensity color glow, errors, link speed |
 | **Latency** | Ping to cf/google/ya via each mihomo proxy group + DIRECT, with session-max bars |
 | **WAN** | IP, gateway, proto, uptime, ISP DNS |
-| **Clients** | DHCP leases with wired/WiFi/TV icons and speed hints |
+| **Clients** | DHCP leases with wired/WiFi/TV/AP icons based on IP mapping |
 | **Mihomo Proxy** | All proxy groups (dynamic), selected node, alive/dead counts |
 | **AdGuard Home** | Query stats, blocked count, top blocked domains, filtering status |
 | **WiFi AP** | External AP reachability and quick-link |
@@ -42,31 +42,56 @@ Passwords are stored locally in the browser (LocalStorage). Use the dashboard on
 wget -qO- https://raw.githubusercontent.com/Anilexis/openwrt-darkboard/main/install.sh | sh
 ```
 
+The installer will interactively ask for:
+- Router IP
+- Mihomo API port (default: 9090)
+- AdGuard Home port (optional)
+- WiFi AP IP (optional)
+- Wired client mapping (optional) — see "Client mapping" below
+
+Passwords (LuCI root, Mihomo secret, AdGuard credentials) are **not** asked during install — they are entered in the browser on first launch via a setup modal and stored in localStorage.
+
 ---
 
 ## Manual Install
 
 ```sh
-# 1. Edit the CONFIG block at the top of dashboard.html
-nano dashboard.html   # edit const C = { ... }
+# 1. Download files from GitHub
+wget -O dashboard.html https://raw.githubusercontent.com/Anilexis/openwrt-darkboard/main/dashboard.html
+wget -O dashboard.json https://raw.githubusercontent.com/Anilexis/openwrt-darkboard/main/dashboard.json
 
-# 2. Copy files
+# 2. (Optional) Edit DEFAULTS and CLIENT_MAP at the top of dashboard.html
+nano dashboard.html   # edit router_ip in DEFAULTS, and CLIENT_MAP entries
+
+# 3. Copy files to their destinations
 cp dashboard.html /www/dashboard.html
 cp dashboard.json /usr/share/rpcd/acl.d/dashboard.json
 
-# 3. Reload rpcd ACL
+# 4. Reload rpcd ACL
 /etc/init.d/rpcd restart
 
-# 4. Open in browser
+# 5. Open in browser
 # http://192.168.1.1/dashboard.html
 ```
 
+On the first launch, the dashboard will open a setup modal where you enter passwords (LuCI, Mihomo, AdGuard). They are stored only in your browser's localStorage.
+
 ## Customization
 
-### Add wired clients (for correct icon display)
+### Client mapping
+
+The CLIENTS panel uses a static IP-based mapping to determine client type and icon. Edit `CLIENT_MAP` at the top of `dashboard.html`:
+
 ```js
-const WIRED_IPS = new Set(['192.168.1.2', '192.168.1.3']); // your wired client IPs
+const CLIENT_MAP = {
+  '192.168.1.2': { type: 'pc', iface: 'eth2' },
+  '192.168.1.3': { type: 'pc', iface: 'eth3' },
+  '192.168.1.4': { type: 'ap', iface: 'eth4' },
+  '192.168.1.5': { type: 'tv', iface: 'eth5' },
+};
 ```
+
+Supported types: `pc`, `tv`, `ap`, `wifi`. Clients not in the map default to WiFi. Hostnames are resolved automatically from DHCP leases.
 
 ### Add/remove services from the services panel
 ```js
@@ -110,7 +135,7 @@ MIT
 | **Interfaces** | RX/TX с цветовой индикацией нагрузки (glow на высокой скорости) |
 | **Latency** | Пинги через каждую группу mihomo + DIRECT |
 | **WAN** | IP, шлюз, протокол, аптайм, DNS провайдера |
-| **Clients** | DHCP-клиенты с иконками WiFi/проводных/TV |
+| **Clients** | Клиенты с иконками по IP-маппингу (PC/TV/AP/WiFi) |
 | **Mihomo Proxy** | Все proxy-группы динамически, выбранный узел, живые/мёртвые |
 | **AdGuard Home** | Статистика запросов, блокировки, топ заблокированных доменов |
 | **WiFi AP** | Доступность внешней AP и ссылка на админку |
@@ -137,49 +162,54 @@ wget -qO- https://raw.githubusercontent.com/Anilexis/openwrt-darkboard/main/inst
 
 Установщик интерактивно спросит:
 - IP роутера
-- Данные AdGuard Home
+- Порт Mihomo API (по умолчанию: 9090)
+- Порт AdGuard Home (опционально)
 - IP внешней WiFi AP (опционально)
+- Маппинг проводных клиентов (опционально) — см. раздел «Настройка клиентов»
 
-Затем пропатчит `dashboard.html`, скопирует файлы и перезапустит `rpcd`.
+Пароли (LuCI root, секрет Mihomo, данные AdGuard) **не спрашиваются** при установке — они вводятся в браузере при первом запуске через модальное окно настройки и сохраняются в localStorage.
 
 ---
 
 ## Ручная установка
 
 ```sh
-# 1. Отредактировать блок CONFIG в начале dashboard.html
-nano dashboard.html   # отредактировать const C = { ... }
+# 1. Скачать файлы с GitHub
+wget -O dashboard.html https://raw.githubusercontent.com/Anilexis/openwrt-darkboard/main/dashboard.html
+wget -O dashboard.json https://raw.githubusercontent.com/Anilexis/openwrt-darkboard/main/dashboard.json
 
-# 2. Скопировать файлы
+# 2. (Опционально) Отредактировать DEFAULTS и CLIENT_MAP в начале dashboard.html
+nano dashboard.html   # изменить router_ip в DEFAULTS и записи CLIENT_MAP
+
+# 3. Скопировать файлы по назначению
 cp dashboard.html /www/dashboard.html
 cp dashboard.json /usr/share/rpcd/acl.d/dashboard.json
 
-# 3. Перезагрузить ACL
+# 4. Перезагрузить ACL
 /etc/init.d/rpcd restart
 
-# 4. Открыть в браузере
+# 5. Открыть в браузере
 # http://192.168.1.1/dashboard.html
 ```
 
----
-
-## Автоопределение оборудования
-
-Дашборд определяет параметры железа самостоятельно при запуске:
-
-- **Количество ядер CPU** — из `/proc/cpuinfo`, fallback через `system.info`
-- **Сетевые интерфейсы** — из `network.device` (показываются только существующие)
-- **Группы прокси mihomo** — из API mihomo, все группы `Selector`/`URLTest`/`Fallback`
-- **Сервисы** — статус только у существующих, неустановленные показывают `N/A`
+При первом запуске дашборд откроет окно настройки, где нужно ввести пароли (LuCI, Mihomo, AdGuard). Они сохраняются только в localStorage вашего браузера.
 
 ---
 
-## Настройка проводных клиентов
+## Настройка клиентов
+
+Панель CLIENTS использует статический маппинг по IP-адресу для определения типа устройства и иконки. Отредактируйте `CLIENT_MAP` в начале `dashboard.html`:
 
 ```js
-// Укажи IP проводных клиентов для правильных иконок в CLIENTS
-const WIRED_IPS = new Set(['192.168.1.2', '192.168.1.3']);
+const CLIENT_MAP = {
+  '192.168.1.2': { type: 'pc', iface: 'eth2' },
+  '192.168.1.3': { type: 'pc', iface: 'eth3' },
+  '192.168.1.4': { type: 'ap', iface: 'eth4' },
+  '192.168.1.5': { type: 'tv', iface: 'eth5' },
+};
 ```
+
+Поддерживаемые типы: `pc`, `tv`, `ap`, `wifi`. Клиенты, не указанные в маппинге, отображаются как WiFi. Имена хостов определяются автоматически из DHCP leases.
 
 ---
 
