@@ -226,10 +226,11 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 }
 .client-row:last-child{border-bottom:none;}
 .cicon{width:30px;text-align:left;flex-shrink:0;font-style:normal;font-size:var(--text-xxs);font-weight:700;}
-.cicon.w5{color:var(--cyan);}
+.cicon.w5{color:var(--orange);}
 .cicon.w24{color:var(--yellow);}
 .cicon.eth{color:var(--blue);}
 .cicon.ap{color:var(--purple);}
+.cicon.tv{color:var(--cyan);}
 .cname{flex:1;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .cip{color:var(--text-muted);font-variant-numeric:tabular-nums;white-space:nowrap;margin-left:auto;padding-left:3px;}
 
@@ -1786,8 +1787,9 @@ async function update_clients() {
 
     let bandClass;
     if (devType === 'ap')   bandClass = 'ap';
+    else if (devType === 'tv')   bandClass = 'tv';
     else if (devType === 'wifi') bandClass = 'w5';
-    else bandClass = 'eth'; // pc, tv
+    else bandClass = 'eth'; // pc
 
     const symMap = { tv: '[TV]', pc: '[PC]', wifi: '[WF]', ap: '[AP]' };
     const sym = symMap[devType] || '[??]';

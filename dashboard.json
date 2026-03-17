@@ -120,6 +120,9 @@
         "/usr/bin/nvme": [
           "exec"
         ],
+        "/sbin/logread": [
+          "exec"
+        ],
         "/etc/init.d/*": [
           "exec"
         ]
