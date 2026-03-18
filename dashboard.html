@@ -1071,15 +1071,8 @@ async function update_sysinfo(prefetched) {
 }
 
 // ===== TEMP =====
-// sysfs is a simple file read (fast), sensors spawns a process (slow) — try sysfs first
 async function update_temp(prefetched) {
-  try {
-    const raw = prefetched?.thermal ?? await file_read('/sys/class/thermal/thermal_zone0/temp');
-    if (raw) {
-      const val = parseInt(raw), c = val > 1000 ? Math.round(val / 1000) : val;
-      if (c > 0) { const el = $('tb-temp'); el.textContent = c + '\u00B0C'; el.style.color = c > 80 ? 'var(--red)' : c > 70 ? 'var(--yellow)' : 'var(--green)'; return; }
-    }
-  } catch(e) {}
+  // STEP 1: First, we try to get the exact temperature of the processor through sensors (it works slower, but is more accurate)
   try {
     const r = await file_exec('/usr/sbin/sensors', ['-j']);
     const out = r.stdout?.trim();
@@ -1089,13 +1082,28 @@ async function update_temp(prefetched) {
         for (const [, val] of Object.entries(chip))
           if (typeof val === 'object' && val !== null)
             for (const [k, v] of Object.entries(val))
+              // We look for physical core sensors (usually temp1_input, temp2_input, etc.)
               if (k.match(/temp\d+_input/) && typeof v === 'number' && v > maxT) maxT = v;
       if (maxT > 0) {
         const c = Math.round(maxT), el = $('tb-temp');
-        el.textContent = c + '\u00B0C'; el.style.color = c > 80 ? 'var(--red)' : c > 70 ? 'var(--yellow)' : 'var(--green)'; return;
+        el.textContent = c + '\u00B0C'; el.style.color = c > 80 ? 'var(--red)' : c > 70 ? 'var(--yellow)' : 'var(--green)';
+        return;
       }
     }
   } catch(e) {}
+
+  // STEP 2: If sensors fails (no package or required sensors), fall back to standard ACPI (thermal_zone0)
+  try {
+    const raw = prefetched?.thermal ?? await file_read('/sys/class/thermal/thermal_zone0/temp');
+    if (raw) {
+      const val = parseInt(raw), c = val > 1000 ? Math.round(val / 1000) : val;
+      if (c > 0) { const el = $('tb-temp'); el.textContent = c + '\u00B0C';
+      el.style.color = c > 80 ? 'var(--red)' : c > 70 ? 'var(--yellow)' : 'var(--green)'; return;
+      }
+    }
+  } catch(e) {}
+
+  // STEP 3: If nothing works at all
   $('tb-temp').textContent = 'n/a'; $('tb-temp').style.color = 'var(--text-muted)';
 }
 
