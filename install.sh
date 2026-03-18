@@ -3,11 +3,13 @@
 # Usage: wget -qO- https://raw.githubusercontent.com/Anilexis/openwrt-darkboard/main/install.sh | sh
 set -e
 
+BRANCH="${1:-main}"
+
 DASH_SRC="dashboard.html"
 DASH_DST="/www/dashboard.html"
 ACL_DST="/usr/share/rpcd/acl.d/dashboard.json"
 ACL_SRC="dashboard.json"
-REPO_URL="https://raw.githubusercontent.com/Anilexis/openwrt-darkboard/main"
+REPO_URL="https://raw.githubusercontent.com/Anilexis/openwrt-darkboard/$BRANCH"
 
 RED=$(printf '\033[0;31m')
 GRN=$(printf '\033[0;32m')
