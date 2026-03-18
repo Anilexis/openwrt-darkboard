@@ -561,6 +561,11 @@ const CLIENT_MAP = {
   '192.168.1.4': { type: 'ap', iface: 'eth4' },
   '192.168.1.5': { type: 'tv', iface: 'eth5' },
 };
+// Defining all LAN interfaces
+const LAN_IFACES = new Set(
+  Object.values(CLIENT_MAP).map(v => v.iface).filter(Boolean)
+);
+// Set { 'eth2', 'eth3', 'eth4', 'eth5' }
 
 // ===== CONFIG (mutable, updated from localStorage or modal) =====
 const C = {
@@ -1204,8 +1209,18 @@ async function update_net(prefetched) {
     const en = $('ifn-' + name); if (en) { en.textContent = name; en.className = 'ifname ' + (up ? 'up' : 'down'); }
     const es = $('ifs-' + name); if (es) es.textContent = spdStr;
     const el = $('ifl-' + name); if (el) el.textContent = up ? 'UP' : 'DOWN';
-    const erxEl = $('ifrx-' + name); if (erxEl) { erxEl.textContent = '\u2193' + rr; erxEl.className = 'rx ' + rxCls; }
-    const etxEl = $('iftx-' + name); if (etxEl) { etxEl.textContent = '\u2191' + tr; etxEl.className = 'tx ' + txCls; }
+    const erxEl = id(`ifrx-${name}`);
+    const etxEl = id(`iftx-${name}`);
+    const isLan = LAN_IFACES.has(name);
+    if (isLan) {
+      // LAN: on the left (ifrx) we show download (router tx = cyan), on the right (iftx) — upload (router rx = orange)
+      if (erxEl) { erxEl.textContent = '↓' + tr; erxEl.className = `rx ${txCls}`; }
+      if (etxEl) { etxEl.textContent = '↑' + rr; etxEl.className = `tx ${rxCls}`; }
+    } else {
+      // WAN and others: unchanged
+      if (erxEl) { erxEl.textContent = '↓' + rr; erxEl.className = `rx ${rxCls}`; }
+      if (etxEl) { etxEl.textContent = '↑' + tr; etxEl.className = `tx ${txCls}`; }
+    }
     const ee = $('ife-' + name); if (ee) ee.textContent = (erx > 0 || etx > 0) ? ' err:' + (erx + etx) : '';
     const et = $('ift-' + name); if (et) et.textContent = fmt_sz(rx) + '/' + fmt_sz(tx);
   }
