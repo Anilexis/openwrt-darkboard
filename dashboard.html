@@ -510,6 +510,14 @@ hr{border:none;border-top:1px solid var(--border);margin:2px 0;}
       <input type="password" id="m-agh" placeholder="(blank = none)" autocomplete="new-password">
     </div>
 
+    <div class="modal-section">AriaNG</div>
+    <div class="modal-row">
+      <div class="modal-field">
+        <label>AriaNG port</label>
+        <input type="number" id="m-ariang-port" placeholder="6800" autocomplete="off">
+      </div>
+    </div>
+
     <div class="modal-section">WiFi Access Point (external AP)</div>
     <div class="modal-row">
       <div class="modal-field">
@@ -551,6 +559,7 @@ const DEFAULTS = {
   wifi_ap_ip:   '192.168.1.4',
   wifi_ap_port: 80,
   wifi_ap_https:false,
+  ariangport: 6800,
 };
 
 // Static client map: IP -> { type: 'pc'|'tv'|'ap'|'wifi', iface: 'ethN' }
@@ -583,6 +592,7 @@ const C = {
   wifi_ap:        DEFAULTS.wifi_ap_ip,
   wifi_ap_port:   DEFAULTS.wifi_ap_port,
   wifi_ap_https:  DEFAULTS.wifi_ap_https,
+  ariangport:     DEFAULTS.ariangport,
   fast:   2000,
   slow:   8000,
   vpn:    5000,
@@ -620,6 +630,7 @@ function apply_router_url(routerUrl) {
     if (s.adguard_user)  C.adguard_user  = s.adguard_user;
     if (s.wifi_ap_port)  C.wifi_ap_port  = parseInt(s.wifi_ap_port) || DEFAULTS.wifi_ap_port;
     if (s.wifi_ap_https !== undefined) C.wifi_ap_https = !!s.wifi_ap_https;
+    if (s.ariangport)  C.ariangport  = parseInt(s.ariangport)  || DEFAULTS.ariangport;
     C.luci_pass     = s.luci_pass     || '';
     C.mihomo_secret = s.mihomo_secret || '';
     C.adguard_pass  = s.adguard_pass  || '';
@@ -636,15 +647,17 @@ function apply_router_url(routerUrl) {
 })();
 
 // ===== TOPBAR LINKS (dynamic, rebuilt whenever config changes) =====
-function rebuild_topbar_links() {
+async function rebuild_topbar_links() {
   const host = C.adguard_host || DEFAULTS.router_ip;
   const luci_port = C.luci_port || DEFAULTS.luci_port;
   const mihomo_port = C.mihomo_port || DEFAULTS.mihomo_port;
   const agh_port = C.adguard_port || DEFAULTS.adguard_port;
+  const ariangport= C.ariangport  || DEFAULTS.ariangport;
 
   const luci_url = 'http://' + host + (luci_port !== 80 ? ':' + luci_port : '');
   const meta_url = 'http://' + host + ':' + mihomo_port + '/ui';
   const agh_url  = 'http://' + host + ':' + agh_port;
+  const ariangurl= 'http://' + host + ':' + ariangport; 
 
   let html = '';
   html += '<a class="tb-link" href="' + luci_url + '" target="_blank" rel="noopener">LuCI</a>';
@@ -659,6 +672,15 @@ function rebuild_topbar_links() {
     html += '<a class="tb-link" href="' + ap_url + '" target="_blank" rel="noopener">WiFi AP</a>';
   }
 
+  try {
+    const r = await luci_call('service', 'list', { name: 'aria2' });
+    const inst = r?.[1]?.aria2?.instances;
+    const running = inst && Object.values(inst).some(i => i.running);
+    if (running) {
+      html += `<a class="tb-link" href="${ariangurl}" target="_blank" rel="noopener">AriaNG</a>`;
+    }
+  } catch(e) {}
+
   const ct = document.getElementById('tb-links-ct');
   if (ct) ct.innerHTML = html;
 
@@ -672,36 +694,36 @@ function rebuild_topbar_links() {
 // ===== MODAL =====
 function modal_show(){
   const s = JSON.parse(localStorage.getItem('darkboard_creds') || 'null') || {};
-  const gm = id => document.getElementById(id);
-  gm('m-router').value       = s.router         || C.router    || 'http://' + DEFAULTS.router_ip;
-  gm('m-luci-port').value    = s.luci_port       || C.luci_port || DEFAULTS.luci_port;
-  gm('m-luci').value         = s.luci_pass       || '';
-  gm('m-mihomo-port').value  = s.mihomo_port     || C.mihomo_port || DEFAULTS.mihomo_port;
-  gm('m-mihomo').value       = s.mihomo_secret   || '';
-  gm('m-agh-port').value     = s.adguard_port    || C.adguard_port || DEFAULTS.adguard_port;
-  gm('m-agh-user').value     = s.adguard_user    || C.adguard_user || DEFAULTS.adguard_user;
-  gm('m-agh').value          = s.adguard_pass    || '';
-  gm('m-wifiap').value       = (s.wifi_ap !== undefined ? s.wifi_ap : C.wifi_ap) || '';
-  gm('m-wifiap-port').value  = s.wifi_ap_port    || C.wifi_ap_port || DEFAULTS.wifi_ap_port;
-  gm('m-wifiap-https').checked = s.wifi_ap_https !== undefined ? !!s.wifi_ap_https : C.wifi_ap_https;
+  $('m-router').value       = s.router         || C.router    || 'http://' + DEFAULTS.router_ip;
+  $('m-luci-port').value    = s.luci_port       || C.luci_port || DEFAULTS.luci_port;
+  $('m-luci').value         = s.luci_pass       || '';
+  $('m-mihomo-port').value  = s.mihomo_port     || C.mihomo_port || DEFAULTS.mihomo_port;
+  $('m-mihomo').value       = s.mihomo_secret   || '';
+  $('m-agh-port').value     = s.adguard_port    || C.adguard_port || DEFAULTS.adguard_port;
+  $('m-agh-user').value     = s.adguard_user    || C.adguard_user || DEFAULTS.adguard_user;
+  $('m-agh').value          = s.adguard_pass    || '';
+  $('m-wifiap').value       = (s.wifi_ap !== undefined ? s.wifi_ap : C.wifi_ap) || '';
+  $('m-wifiap-port').value  = s.wifi_ap_port    || C.wifi_ap_port || DEFAULTS.wifi_ap_port;
+  $('m-wifiap-https').checked = s.wifi_ap_https !== undefined ? !!s.wifi_ap_https : C.wifi_ap_https;
+  $('m-ariang-port').value = s.ariangport || C.ariangport || DEFAULTS.ariangport;
   document.getElementById('setup-modal').classList.remove('hidden');
-  setTimeout(() => gm('m-router').focus(), 60);
+  setTimeout(() => $('m-router').focus(), 60);
 }
 function modal_save(){
-  const gm = id => document.getElementById(id);
-  const router = (gm('m-router').value || '').replace(/\/+$/, '').trim() || 'http://' + DEFAULTS.router_ip;
+  const router = ($('m-router').value || '').replace(/\/+$/, '').trim() || 'http://' + DEFAULTS.router_ip;
   const creds = {
     router:        router,
-    luci_port:     parseInt(gm('m-luci-port').value) || DEFAULTS.luci_port,
-    luci_pass:     gm('m-luci').value.trim(),
-    mihomo_port:   parseInt(gm('m-mihomo-port').value) || DEFAULTS.mihomo_port,
-    mihomo_secret: gm('m-mihomo').value.trim(),
-    adguard_port:  parseInt(gm('m-agh-port').value) || DEFAULTS.adguard_port,
-    adguard_user:  gm('m-agh-user').value.trim() || DEFAULTS.adguard_user,
-    adguard_pass:  gm('m-agh').value.trim(),
-    wifi_ap:       gm('m-wifiap').value.trim(),
-    wifi_ap_port:  parseInt(gm('m-wifiap-port').value) || DEFAULTS.wifi_ap_port,
-    wifi_ap_https: gm('m-wifiap-https').checked,
+    luci_port:     parseInt($('m-luci-port').value) || DEFAULTS.luci_port,
+    luci_pass:     $('m-luci').value.trim(),
+    mihomo_port:   parseInt($('m-mihomo-port').value) || DEFAULTS.mihomo_port,
+    mihomo_secret: $('m-mihomo').value.trim(),
+    adguard_port:  parseInt($('m-agh-port').value) || DEFAULTS.adguard_port,
+    adguard_user:  $('m-agh-user').value.trim() || DEFAULTS.adguard_user,
+    adguard_pass:  $('m-agh').value.trim(),
+    wifi_ap:       $('m-wifiap').value.trim(),
+    wifi_ap_port:  parseInt($('m-wifiap-port').value) || DEFAULTS.wifi_ap_port,
+    wifi_ap_https: $('m-wifiap-https').checked,
+    ariangport: parseInt($('m-ariang-port').value) || DEFAULTS.ariangport,
   };
   localStorage.setItem('darkboard_creds', JSON.stringify(creds));
   // Apply to runtime config
@@ -711,6 +733,7 @@ function modal_save(){
   C.adguard_user  = creds.adguard_user;
   C.wifi_ap_port  = creds.wifi_ap_port;
   C.wifi_ap_https = creds.wifi_ap_https;
+  C.ariangport = creds.ariangport;
   apply_router_url(creds.router);
   // Override mihomo_api with updated port
   C.mihomo_api    = 'http://' + C.adguard_host + ':' + C.mihomo_port;
@@ -726,9 +749,13 @@ function modal_save(){
   C.wifi_ap       = creds.wifi_ap;
   document.getElementById('setup-modal').classList.add('hidden');
   tok = null;
-  rebuild_topbar_links();
   init_wifi_admin_link();
-  try { luci_login().then(() => { update_board(); }); } catch(e) {}
+  try { 
+    luci_login().then(() => { 
+      rebuild_topbar_links(); // Вызываем внутри then, когда токен уже есть
+      update_board(); 
+    }); 
+  } catch(e) {}
 }
 function modal_skip(){
   document.getElementById('setup-modal').classList.add('hidden');
@@ -1209,8 +1236,8 @@ async function update_net(prefetched) {
     const en = $('ifn-' + name); if (en) { en.textContent = name; en.className = 'ifname ' + (up ? 'up' : 'down'); }
     const es = $('ifs-' + name); if (es) es.textContent = spdStr;
     const el = $('ifl-' + name); if (el) el.textContent = up ? 'UP' : 'DOWN';
-    const erxEl = id(`ifrx-${name}`);
-    const etxEl = id(`iftx-${name}`);
+    const erxEl = $(`ifrx-${name}`);
+    const etxEl = $(`iftx-${name}`);
     const isLan = LAN_IFACES.has(name);
     if (isLan) {
       // LAN: on the left (ifrx) we show download (router tx = cyan), on the right (iftx) — upload (router rx = orange)
@@ -2038,8 +2065,8 @@ async function reboot_router(btn) {
 
 // ===== MAIN LOOP =====
 async function init() {
-  rebuild_topbar_links();
   try { await luci_login(); } catch(e) { console.warn('login', e); }
+  await rebuild_topbar_links();
   await Promise.allSettled([init_cores(), update_board(), init_lat_groups()]);
   init_wifi_admin_link();
   async function fast() {
