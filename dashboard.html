@@ -657,7 +657,7 @@ async function rebuild_topbar_links() {
   const luci_url = 'http://' + host + (luci_port !== 80 ? ':' + luci_port : '');
   const meta_url = 'http://' + host + ':' + mihomo_port + '/ui';
   const agh_url  = 'http://' + host + ':' + agh_port;
-  const ariangurl= 'http://' + host + ':' + ariangport; 
+  const ariangurl= 'http://' + host + '/ariang'; 
 
   let html = '';
   html += '<a class="tb-link" href="' + luci_url + '" target="_blank" rel="noopener">LuCI</a>';
