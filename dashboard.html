@@ -681,6 +681,14 @@ async function rebuild_topbar_links() {
     }
   } catch(e) {}
 
+  try {
+    const r_jf = await file_exec('/usr/bin/curl', ['-s', '-m', '2', '-o', '/dev/null', '-w', '%{http_code}', 'http://127.0.0.1:8096/']);
+    const code = parseInt((r_jf.stdout || '').trim());
+    if (code > 0 && code < 600) {
+      html += `<a class="tb-link" href="${jellyfin_url}" target="_blank" rel="noopener">Jellyfin</a>`;
+    }
+  } catch(e) {}
+
   const ct = document.getElementById('tb-links-ct');
   if (ct) ct.innerHTML = html;
 
