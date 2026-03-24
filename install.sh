@@ -120,7 +120,7 @@ ask CONFIRM "Apply? [Y/n]:"
 TITLE "Downloading from GitHub"
 wget -q -O "$WORKDIR/$DASH_SRC"                        "$REPO_URL/dashboard.html"                   || err "Failed to download dashboard.html"
 wget -q -O "$WORKDIR/$ACL_SRC"                         "$REPO_URL/dashboard.json"                   || err "Failed to download dashboard.json"
-wget -q -O "$WORKDIR/manifest.json"                    "$REPO_URL/manifest.json"                    || err "Failed to download manifest.json"
+wget -q -O "$WORKDIR/manifest.webmanifest"             "$REPO_URL/manifest.webmanifest"             || err "Failed to download manifest.webmanifest"
 wget -q -O "$WORKDIR/sw.js"                            "$REPO_URL/sw.js"                            || err "Failed to download sw.js"
 wget -q -O "$WORKDIR/web-app-manifest-192x192.png"     "$REPO_URL/web-app-manifest-192x192.png"     || err "Failed to download icon 192"
 wget -q -O "$WORKDIR/web-app-manifest-512x512.png"     "$REPO_URL/web-app-manifest-512x512.png"     || err "Failed to download icon 512"
@@ -212,7 +212,7 @@ rm -f /tmp/dashboard-install.html
 # ============================================================ PWA files
 TITLE "Installing PWA files"
 
-PWA_FILES="manifest.json sw.js web-app-manifest-192x192.png web-app-manifest-512x512.png favicon.ico favicon.svg favicon-96x96.png apple-touch-icon.png"
+PWA_FILES="manifest.webmanifest sw.js web-app-manifest-192x192.png web-app-manifest-512x512.png favicon.ico favicon.svg favicon-96x96.png apple-touch-icon.png"
 
 for f in $PWA_FILES; do
   cp "$WORKDIR/$f" "/www/$f"

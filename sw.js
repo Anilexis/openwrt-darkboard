@@ -2,7 +2,7 @@ const CACHE_NAME = 'darkboard-v0.1.2-rc1'; // Change the version when updating d
 
 const ASSETS = [
   './dashboard.html',
-  './manifest.json',
+  './manifest.webmanifest',
   './web-app-manifest-192x192.png',
   './web-app-manifest-512x512.png'
 ];
