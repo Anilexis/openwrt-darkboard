@@ -408,7 +408,15 @@ hr{border:none;border-top:1px solid var(--border);margin:2px 0;}
 
     <!-- R1 C3 - STORAGE -->
     <div class="panel cell-storage">
-      <div class="ptitle">STORAGE <span id="nvme-temp" style="font-size:var(--text-xxs);color:var(--text-faint);font-weight:400;letter-spacing:0;text-transform:none"></span></div>
+      <div class="ptitle">
+        <span>STORAGE <span id="nvme-temp" style="font-size:var(--text-xxs);color:var(--text-faint);font-weight:400;letter-spacing:0;text-transform:none"></span></span>
+        <div class="ptitle-r">
+          <label style="display:flex;align-items:center;gap:4px;font-size:var(--text-xxs);color:var(--text-faint);font-weight:400;letter-spacing:0;text-transform:none;cursor:pointer;" title="Show physical disks only">
+          <input type="checkbox" id="storage-filter-cb" onchange="toggleStorageFilter()" style="accent-color:var(--cyan);margin:0;width:11px;height:11px;cursor:pointer;flex-shrink:0;">
+            compact
+          </label>
+        </div>
+      </div>
       <div class="si" id="disk-p"><div class="met"><span class="ml" style="color:var(--text-faint)">scanning...</span></div></div>
     </div>
 
@@ -812,7 +820,7 @@ function modal_save(){
   luci_login().then(() => { 
     rebuild_topbar_links(); 
     update_board(); 
-  }).catch(e => console.warn('Login failed after setup:', e))
+  }).catch(e => console.warn('Login failed after setup:', e));
 }
 function modal_skip(){
   document.getElementById('setup-modal').classList.add('hidden');
@@ -1155,6 +1163,19 @@ async function update_temp(prefetched) {
   $('tb-temp').textContent = 'n/a'; $('tb-temp').style.color = 'var(--text-muted)';
 }
 
+// ===== STORAGE FILTER =====
+let storageFilterMain = localStorage.getItem('darkboard_storage_main') !== '0';
+function toggleStorageFilter() {
+  const cb = document.getElementById('storage-filter-cb');
+  storageFilterMain = cb.checked;
+  localStorage.setItem('darkboard_storage_main', storageFilterMain ? '1' : '0');
+  update_disks();
+}
+document.addEventListener('DOMContentLoaded', () => {
+  const cb = document.getElementById('storage-filter-cb');
+  if (cb) cb.checked = storageFilterMain;
+});
+
 // ===== DISKS =====
 async function update_disks() {
   try {
@@ -1166,13 +1187,25 @@ async function update_disks() {
       else if (Array.isArray(d)) mounts = d;
       else if (typeof d === 'object') mounts = Object.values(d).filter(v => typeof v === 'object' && v !== null && v.mount);
       if (mounts && mounts.length > 0) {
-        const seen = new Set, filtered = [];
-        for (const m of mounts) {
+        const seenMp = new Set(), seenDev = new Set(), filtered = [];
+        const sortedMounts = mounts.slice().sort((a, b) => 
+          (a.mount || a.target || '').length - (b.mount || b.target || '').length
+        );
+
+        for (const m of sortedMounts) {
           const mp = m.mount || m.target || '--', dev = m.device;
+                
           if (dev === 'tmpfs' || dev === 'devtmpfs' || dev === 'none') continue;
           if (/^(\/proc|\/sys|\/tmp)/.test(mp)) continue;
-          if (seen.has(mp)) continue;
-          seen.add(mp); filtered.push(m);
+          if (seenMp.has(mp)) continue;
+
+          if (storageFilterMain) {
+            if (seenDev.has(dev)) continue;
+            if (mp.includes('/overlay2/') || mp.includes('/containers/')) continue;
+          }
+          seenMp.add(mp);
+          seenDev.add(dev);
+          filtered.push(m);
         }
         let html = '';
         for (const m of filtered) {
