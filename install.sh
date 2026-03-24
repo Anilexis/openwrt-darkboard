@@ -1,6 +1,7 @@
 #!/bin/sh
 # DarkBoard installer for OpenWRT
 # Usage: wget -qO- https://raw.githubusercontent.com/Anilexis/openwrt-darkboard/main/install.sh | sh
+# For test branch: wget -qO- https://raw.githubusercontent.com/Anilexis/openwrt-darkboard/test/install.sh | sh -s test
 set -e
 
 BRANCH="${1:-main}"
@@ -10,6 +11,9 @@ DASH_DST="/www/dashboard.html"
 ACL_DST="/usr/share/rpcd/acl.d/dashboard.json"
 ACL_SRC="dashboard.json"
 REPO_URL="https://raw.githubusercontent.com/Anilexis/openwrt-darkboard/$BRANCH"
+
+WORKDIR="/tmp/darkboard-install"
+mkdir -p "$WORKDIR"
 
 RED=$(printf '\033[0;31m')
 GRN=$(printf '\033[0;32m')
@@ -114,13 +118,21 @@ ask CONFIRM "Apply? [Y/n]:"
 
 # ============================================================ download files from GitHub
 TITLE "Downloading from GitHub"
-wget -q -O "$DASH_SRC" "$REPO_URL/dashboard.html" || err "Failed to download dashboard.html"
-wget -q -O "$ACL_SRC" "$REPO_URL/dashboard.json"  || err "Failed to download dashboard.json"
+wget -q -O "$WORKDIR/$DASH_SRC"                        "$REPO_URL/dashboard.html"                   || err "Failed to download dashboard.html"
+wget -q -O "$WORKDIR/$ACL_SRC"                         "$REPO_URL/dashboard.json"                   || err "Failed to download dashboard.json"
+wget -q -O "$WORKDIR/manifest.json"                    "$REPO_URL/manifest.json"                    || err "Failed to download manifest.json"
+wget -q -O "$WORKDIR/sw.js"                            "$REPO_URL/sw.js"                            || err "Failed to download sw.js"
+wget -q -O "$WORKDIR/web-app-manifest-192x192.png"     "$REPO_URL/web-app-manifest-192x192.png"     || err "Failed to download icon 192"
+wget -q -O "$WORKDIR/web-app-manifest-512x512.png"     "$REPO_URL/web-app-manifest-512x512.png"     || err "Failed to download icon 512"
+wget -q -O "$WORKDIR/favicon.ico"                      "$REPO_URL/favicon.ico"                      || err "Failed to download favicon.ico"
+wget -q -O "$WORKDIR/favicon.svg"                      "$REPO_URL/favicon.svg"                      || err "Failed to download favicon.svg"
+wget -q -O "$WORKDIR/favicon-96x96.png"                "$REPO_URL/favicon-96x96.png"                || err "Failed to download favicon-96x96.png"
+wget -q -O "$WORKDIR/apple-touch-icon.png"             "$REPO_URL/apple-touch-icon.png"             || err "Failed to download apple-touch-icon.png"
 ok "Files downloaded"
 
 # ============================================================ patch
 TITLE "Patching"
-cp "$DASH_SRC" /tmp/dashboard-install.html
+cp "$WORKDIR/$DASH_SRC" /tmp/dashboard-install.html
 
 # Escape all user values for sed
 E_ROUTER_IP=$(escape_sed "$ROUTER_IP")
@@ -193,9 +205,21 @@ ok "dashboard.html patched"
 TITLE "Installing"
 cp /tmp/dashboard-install.html "$DASH_DST"
 ok "Installed $DASH_DST"
-cp "$ACL_SRC" "$ACL_DST"
+cp "$WORKDIR/$ACL_SRC" "$ACL_DST"
 ok "Installed $ACL_DST"
 rm -f /tmp/dashboard-install.html
+
+# ============================================================ PWA files
+TITLE "Installing PWA files"
+
+PWA_FILES="manifest.json sw.js web-app-manifest-192x192.png web-app-manifest-512x512.png favicon.ico favicon.svg favicon-96x96.png apple-touch-icon.png"
+
+for f in $PWA_FILES; do
+  cp "$WORKDIR/$f" "/www/$f"
+  ok "Installed /www/$f"
+done
+
+rm -rf "$WORKDIR"
 
 # ============================================================ restart rpcd
 TITLE "Restarting rpcd"
