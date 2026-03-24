@@ -658,6 +658,7 @@ async function rebuild_topbar_links() {
   const meta_url = 'http://' + host + ':' + mihomo_port + '/ui';
   const agh_url  = 'http://' + host + ':' + agh_port;
   const ariangurl= 'http://' + host + '/ariang'; 
+  const jellyfin_url = 'http://' + host + ':8096';
 
   let html = '';
   html += '<a class="tb-link" href="' + luci_url + '" target="_blank" rel="noopener">LuCI</a>';
@@ -678,6 +679,14 @@ async function rebuild_topbar_links() {
     const running = inst && Object.values(inst).some(i => i.running);
     if (running) {
       html += `<a class="tb-link" href="${ariangurl}" target="_blank" rel="noopener">AriaNG</a>`;
+    }
+  } catch(e) {}
+
+  try {
+    const r_jf = await file_exec('/usr/bin/curl', ['-s', '-m', '2', '-o', '/dev/null', '-w', '%{http_code}', 'http://127.0.0.1:8096/']);
+    const code = parseInt((r_jf.stdout || '').trim());
+    if (code > 0 && code < 600) {
+      html += `<a class="tb-link" href="${jellyfin_url}" target="_blank" rel="noopener">Jellyfin</a>`;
     }
   } catch(e) {}
 
@@ -752,7 +761,7 @@ function modal_save(){
   init_wifi_admin_link();
   try { 
     luci_login().then(() => { 
-      rebuild_topbar_links(); // Вызываем внутри then, когда токен уже есть
+      rebuild_topbar_links(); 
       update_board(); 
     }); 
   } catch(e) {}
