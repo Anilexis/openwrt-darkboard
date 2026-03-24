@@ -1685,11 +1685,18 @@ async function update_adguard() {
         const real = ups.filter(u => u && u.trim() && !u.trim().startsWith('#'));
         if (real.length) {
           if (html && !html.endsWith('<hr>')) html += '<hr>';
-          const show = real.slice(0, 2);
-          for (const u of show)
-            html += `<div class="ds"><span class="dl">upstream DNS</span><span class="dv" style="color:var(--text-muted);word-break:break-all">${u}</span></div>`;
-          if (real.length > 2)
-            html += `<div class="ds"><span class="dl"></span><span class="dv muted">+${real.length - 2} more</span></div>`;
+          const LS_KEY = 'agh-dns-expanded';
+          const expanded = localStorage.getItem(LS_KEY) === '1';
+          const visible = expanded ? real : real.slice(0, 2);
+          visible.forEach((u, i) => {
+          const label = i === 0 ? 'upstream DNS' : '';
+          html += `<div class="ds"><span class="dl">${label}</span><span class="dv" style="color:var(--text-muted);word-break:break-all">${u}</span></div>`;
+          });
+          if (!expanded && real.length > 2) {
+            html += `<div class="ds"><span class="dl"></span><span class="dv" style="color:var(--text-muted);cursor:pointer;text-decoration:underline" onclick="localStorage.setItem('agh-dns-expanded','1');updateadguard()">+${real.length - 2} more</span></div>`;
+          } else if (expanded && real.length > 2) {
+            html += `<div class="ds"><span class="dl"></span><span class="dv" style="color:var(--text-faint);cursor:pointer;text-decoration:underline" onclick="localStorage.setItem('agh-dns-expanded','0');updateadguard()">hide</span></div>`;
+          }  
         }
       }
     } catch(e) {}
