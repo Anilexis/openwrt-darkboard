@@ -26,7 +26,7 @@ A single-file, real-time monitoring dashboard for OpenWRT routers. No Node.js, n
 
 **Responsive:** 4-column desktop grid → 3-column tablet → 2-column mobile.  
 **PWA-ready:** install as a native-like app on Android, iOS, and Windows — no app store needed.
-![PWA manual](https://raw.githubusercontent.com/Anilexis/openwrt-darkboard/main/PWA.md)  
+[PWA manual](https://Anilexis.github.io/openwrt-darkboard/PWA.md)  
 Passwords are stored locally in the browser (LocalStorage). Use the dashboard only on trusted devices!
 
 ---
@@ -146,7 +146,7 @@ MIT
 
 **Адаптивный:** 4 колонки (десктоп) → 3 колонки (планшет) → 2 колонки (телефон).  
 **PWA:** устанавливается как приложение на Android, iOS и Windows — без магазина приложений.
-![PWA мануал](https://raw.githubusercontent.com/Anilexis/openwrt-darkboard/main/PWA.md)  
+[PWA мануал](https://Anilexis.github.io/openwrt-darkboard/PWA.md)  
 Пароли хранятся локально в браузере (LocalStorage). Используйте панель управления только на доверенных устройствах!
 
 ---
