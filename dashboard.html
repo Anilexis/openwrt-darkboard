@@ -280,30 +280,14 @@ hr{border:none;border-top:1px solid var(--border);margin:2px 0;}
 .footer{position:fixed;bottom:0;right:4px;font-size:var(--text-xxs);color:var(--text-faint);z-index:10;}
 .footer a{color:var(--text-faint);text-decoration:none;}
 
-/* ============================================================ TABLETS */
-@media (max-width:1024px) and (min-width:769px){
-  .grid{
-    grid-template-columns: 1fr 1fr;
-    grid-template-rows:auto;
-    grid-auto-rows:minmax(200px,auto);
-    grid-template-areas:
-      "cpu      memory"
-      "storage  services"
-      "ifaces   latency"
-      "wan      clients"
-      "mihomo   adguard"
-      "wifi     wifi";
-  }
-  .panel{min-height:200px;}
-}
 
 /* ============================================================ MOBILE 768px */
 @media (max-width:768px){
   html,body{height:auto;overflow:auto;}
   .dash{height:auto;overflow:visible;}
-  .topbar{height:auto;flex-direction:column;align-items:flex-start;padding:4px 8px;gap:3px;}
+  .topbar{height:auto;flex-direction:row;align-items:center;flex-wrap:wrap;padding:3px 8px;gap:4px;}
   .tb-l,.tb-r{flex-wrap:wrap;gap:5px;font-size:var(--text-xxs);}
-  .tb-r{margin-left:auto;justify-content:flex-end;}
+  .tb-r{margin-left:auto;justify-content:flex-end;flex-wrap:nowrap;}
   .tb-links{margin-left:0;flex-wrap:wrap;}
   .grid{
     flex:none;height:auto;
@@ -328,14 +312,12 @@ hr{border:none;border-top:1px solid var(--border);margin:2px 0;}
     grid-template-columns:1fr 1fr;
     grid-auto-rows:minmax(150px,auto);
     grid-template-areas:
-      "cpu     memory"
-      "storage storage"
-      "ifaces  ifaces"
-      "latency wan"
-      "clients clients"
-      "mihomo  adguard"
-      "services services"
-      "wifi    wifi";
+      "cpu      memory"
+      "storage  wan"
+      "ifaces   clients"
+      "latency  mihomo"
+      "services adguard"
+      "wifi     wifi";
   }
   .panel{min-height:150px;}
 }
@@ -373,9 +355,7 @@ hr{border:none;border-top:1px solid var(--border);margin:2px 0;}
       <span class="tb-sep">|</span>
       <span id="tb-wan-rx" style="color:var(--text-muted);display:inline-block;min-width:160px;white-space:nowrap">WAN --</span>
       <span class="tb-sep">|</span>
-      <span class="tb-clock" id="tb-clk">--:--:--</span>
-      <span id="tb-ntp" style="color:var(--text-faint)" title="last NTP sync"></span>
-      <span class="live"></span>
+<span style="display:inline-flex;align-items:center;gap:4px;white-space:nowrap;flex-shrink:0;"><span class="tb-clock" id="tb-clk">--:--:--</span><span id="tb-ntp" style="color:var(--text-faint)" title="last NTP sync"></span><span class="live"></span></span>
     </div>
   </div>
 
