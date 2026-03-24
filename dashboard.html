@@ -63,7 +63,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .tb-link:hover{color:var(--cyan);border-color:var(--cyan-dim);}
 
 /* ============================================================ DASH WRAPPER */
-.dash{display:flex;flex-direction:column;height:100vh;width:100vw;overflow:hidden;}
+.dash{display:flex;flex-direction:column;height:100vh;width:100vw;overflow:hidden;max-width: 1600px;margin:0 auto;}
 
 /* ============================================================ DESKTOP GRID */
 .grid{
@@ -322,7 +322,7 @@ hr{border:none;border-top:1px solid var(--border);margin:2px 0;}
 }
 
 /* ============================================================ ULTRAWIDE 4K */
-@media (min-width:1920px){
+@media (min-width:1600px){
   body{display:flex;justify-content:center;background:#000;}
   .dash{max-width:1600px;width:100%;border-left:1px solid var(--border);border-right:1px solid var(--border);box-shadow:0 0 50px rgba(0,0,0,0.5);}
 }
