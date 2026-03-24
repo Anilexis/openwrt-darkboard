@@ -147,6 +147,27 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .modal-btn.danger{background:var(--red-dim);color:var(--red);border:1px solid var(--red-dim);}
 .modal-btn.danger:hover{background:var(--red);color:#000;}
 
+/* LATENCY FILTER MODAL */
+.lat-check-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--text-sm);
+  color: var(--text);
+  cursor: pointer;
+  padding: 3px 0;
+}
+.lat-check-row input[type=checkbox] {
+  accent-color: var(--cyan);
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.lat-check-row:hover {
+  color: var(--cyan);
+}
+
 /* ============================================================ CPU CORES */
 .cores{display:grid;grid-template-columns:repeat(4,1fr);gap:2px;margin-top:2px;}
 .core{font-size:var(--text-xs);text-align:center;}
@@ -405,7 +426,11 @@ hr{border:none;border-top:1px solid var(--border);margin:2px 0;}
 
     <!-- R2 C2 - LATENCY -->
     <div class="panel cell-latency">
-      <div class="ptitle">LATENCY</div>
+      <div class="ptitle">LATENCY
+        <div class="ptitle-r">
+          <button class="svc-action" title="Configure latency pools" onclick="showLatencySettings()">&#9965;</button>
+        </div>
+      </div>
       <div class="si" id="ping-p"></div>
     </div>
 
@@ -544,6 +569,22 @@ hr{border:none;border-top:1px solid var(--border);margin:2px 0;}
   </div>
 </div>
 
+<!-- LATENCY SETTINGS MODAL -->
+<div class="modal-overlay hidden" id="latency-modal">
+  <div class="modal-box" style="min-width:300px;max-width:420px;">
+    <div class="modal-title">&#9965; Latency Pool Filter</div>
+    <div class="modal-sub">Select which proxy pools to test. Settings are saved in localStorage.</div>
+    <div id="latency-pool-list" style="display:flex;flex-direction:column;gap:6px;margin-bottom:16px;"></div>
+    <div class="modal-actions">
+      <button class="modal-btn secondary" onclick="latencyModalSelectAll()">All</button>
+      <button class="modal-btn secondary" onclick="latencyModalSelectNone()">None</button>
+      <span style="flex:1"></span>
+      <button class="modal-btn secondary" onclick="closeLatencyModal()">Cancel</button>
+      <button class="modal-btn primary" onclick="saveLatencySettings()">Save</button>
+    </div>
+  </div>
+</div>
+
 <div class="footer"><a href="https://github.com/Anilexis/openwrt-darkboard" target="_blank" rel="noopener noreferrer">DarkBoard</a></div>
 
 <script>
@@ -600,6 +641,15 @@ const C = {
   clients: 10000,
   wifi:   15000,
 };
+
+// ===== STATE =====
+let tok = null, pCPU = null, pNet = {};
+let maxCPU = [];
+let maxRAM = 0, maxBuf = 0, maxCch = 0, maxSwp = 0;
+let maxCT = 0;
+let maxLat = {};
+let ifaceSpdMap = {};
+let wanRxPrev = null, wanTxPrev = null, wanTsPrev = 0;
 
 // Helper: derive all dependent URLs from base router URL
 function apply_router_url(routerUrl) {
@@ -759,12 +809,10 @@ function modal_save(){
   document.getElementById('setup-modal').classList.add('hidden');
   tok = null;
   init_wifi_admin_link();
-  try { 
-    luci_login().then(() => { 
-      rebuild_topbar_links(); 
-      update_board(); 
-    }); 
-  } catch(e) {}
+  luci_login().then(() => { 
+    rebuild_topbar_links(); 
+    update_board(); 
+  }).catch(e => console.warn('Login failed after setup:', e))
 }
 function modal_skip(){
   document.getElementById('setup-modal').classList.add('hidden');
@@ -780,15 +828,6 @@ function show_setup(){ modal_show(); }
 if (!localStorage.getItem('darkboard_creds')) {
   document.addEventListener('DOMContentLoaded', () => { setTimeout(modal_show, 250); });
 }
-
-// ===== STATE =====
-let tok = null, pCPU = null, pNet = {};
-let maxCPU = [];
-let maxRAM = 0, maxBuf = 0, maxCch = 0, maxSwp = 0;
-let maxCT = 0;
-let maxLat = {};
-let ifaceSpdMap = {};
-let wanRxPrev = null, wanTxPrev = null, wanTsPrev = 0;
 
 // ===== UTILS =====
 const $ = id => document.getElementById(id);
@@ -1378,7 +1417,7 @@ async function mihomo_delay(proxyName, testUrl) {
 async function update_ping() {
   latD = {};
   const tasks = [];
-  for (const g of LAT_GROUPS) for (const t of LAT_TARGETS) tasks.push({ key: g.name + '|' + t.label, group: g.name, url: t.url });
+  for (const g of getActiveLAT_GROUPS()) for (const t of LAT_TARGETS) tasks.push({ key: g.name + '|' + t.label, group: g.name, url: t.url });
   const results = await Promise.allSettled(tasks.map(async t => ({ key: t.key, ms: await mihomo_delay(t.group, t.url) })));
   for (const r of results) if (r.status === 'fulfilled' && r.value) latD[r.value.key] = r.value.ms;
   latTS = Date.now(); render_ping();
@@ -1389,7 +1428,7 @@ function render_ping() {
     const d = new Date(latTS);
     html += `<div class="ds" style="margin-bottom:3px"><span class="dl">last check</span><span class="dv" style="color:var(--text-faint)">${[d.getHours(), d.getMinutes(), d.getSeconds()].map(x => String(x).padStart(2, '0')).join(':')}</span></div>`;
   }
-  for (const g of LAT_GROUPS) {
+  for (const g of getActiveLAT_GROUPS()) {
     html += `<div style="margin-bottom:3px"><div style="font-size:var(--text-xs);color:var(--text-muted);margin-bottom:1px">${g.label}</div>`;
     for (const t of LAT_TARGETS) {
       const ms = latD[g.name + '|' + t.label];
@@ -1693,9 +1732,9 @@ async function update_adguard() {
           html += `<div class="ds"><span class="dl">${label}</span><span class="dv" style="color:var(--text-muted);word-break:break-all">${u}</span></div>`;
           });
           if (!expanded && real.length > 2) {
-            html += `<div class="ds"><span class="dl"></span><span class="dv" style="color:var(--text-muted);cursor:pointer;text-decoration:underline" onclick="localStorage.setItem('agh-dns-expanded','1');updateadguard()">+${real.length - 2} more</span></div>`;
+            html += `<div class="ds"><span class="dl"></span><span class="dv" style="color:var(--text-muted);cursor:pointer;text-decoration:underline" onclick="localStorage.setItem('agh-dns-expanded','1');update_adguard()">+${real.length - 2} more</span></div>`;
           } else if (expanded && real.length > 2) {
-            html += `<div class="ds"><span class="dl"></span><span class="dv" style="color:var(--text-faint);cursor:pointer;text-decoration:underline" onclick="localStorage.setItem('agh-dns-expanded','0');updateadguard()">hide</span></div>`;
+            html += `<div class="ds"><span class="dl"></span><span class="dv" style="color:var(--text-faint);cursor:pointer;text-decoration:underline" onclick="localStorage.setItem('agh-dns-expanded','0');update_adguard()">hide</span></div>`;
           }  
         }
       }
@@ -2127,6 +2166,70 @@ async function init() {
   async function wifi() { await update_wifi_ap(); setTimeout(wifi, C.wifi); }
   fast(); slow(); vpn(); ping(); clients(); wifi(); update_ntp_sync();
 }
+
+// ── LATENCY SETTINGS MODAL ──────────────────────────────────────────────────
+const LATENCY_FILTER_KEY = 'darkboard-latency-filter';
+
+function getLatencyFilter() {
+  try {
+    const s = localStorage.getItem(LATENCY_FILTER_KEY);
+    return s ? JSON.parse(s) : null;
+  } catch(e) { return null; }
+}
+
+// Returns filtered LAT_GROUPS respecting saved filter (or all if no filter saved)
+function getActiveLAT_GROUPS() {
+  const filter = getLatencyFilter();
+  if (!filter) return LAT_GROUPS;
+  return LAT_GROUPS.filter(g => filter[g.name] !== false);
+}
+
+function showLatencySettings() {
+  const filter = getLatencyFilter();
+  const list = document.getElementById('latency-pool-list');
+  if (!list) return;
+  list.innerHTML = LAT_GROUPS.map(g => {
+    const checked = filter ? (filter[g.name] !== false) : true;
+    return `<label class="lat-check-row">
+      <input type="checkbox" id="latck-${g.name.replace(/[^a-z0-9]/gi,'_')}" ${checked ? 'checked' : ''}>
+      <span>${g.label}</span>
+    </label>`;
+  }).join('');
+  document.getElementById('latency-modal').classList.remove('hidden');
+}
+
+function closeLatencyModal() {
+  document.getElementById('latency-modal').classList.add('hidden');
+}
+
+function latencyModalSelectAll() {
+  document.querySelectorAll('#latency-pool-list input[type=checkbox]').forEach(c => c.checked = true);
+}
+
+function latencyModalSelectNone() {
+  document.querySelectorAll('#latency-pool-list input[type=checkbox]').forEach(c => c.checked = false);
+}
+
+function saveLatencySettings() {
+  const filter = {};
+  LAT_GROUPS.forEach(g => {
+    const el = document.getElementById('latck-' + g.name.replace(/[^a-z0-9]/gi,'_'));
+    filter[g.name] = el ? el.checked : true;
+  });
+  localStorage.setItem(LATENCY_FILTER_KEY, JSON.stringify(filter));
+  closeLatencyModal();
+  // Re-render immediately with new filter
+  render_ping();
+}
+
+// Close modal on overlay click
+document.addEventListener('DOMContentLoaded', () => {
+  const overlay = document.getElementById('latency-modal');
+  if (overlay) overlay.addEventListener('click', e => {
+    if (e.target === overlay) closeLatencyModal();
+  });
+});
+
 init();
 </script>
 </body>
