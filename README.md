@@ -2,6 +2,8 @@
 
 A single-file, real-time monitoring dashboard for OpenWRT routers. No Node.js, no build tools, no backend — just one `dashboard.html` dropped into `/www/`.
 
+(русский язык ниже)
+
 **🔥 [Click here for Demo](https://Anilexis.github.io/openwrt-darkboard/demo.html) 🔥**
 ![Dashboard preview](https://raw.githubusercontent.com/Anilexis/openwrt-darkboard/main/preview.png)
 
@@ -22,7 +24,9 @@ A single-file, real-time monitoring dashboard for OpenWRT routers. No Node.js, n
 | **WiFi AP** | External AP reachability and quick-link |
 | **Topbar** | Hostname, kernel, firmware, uptime, CPU temp, WAN traffic counter, clock |
 
-**Responsive:** 4-column desktop grid → 2-column tablet → 1–2-column mobile, PWA-ready (add to home screen).
+**Responsive:** 4-column desktop grid → 3-column tablet → 2-column mobile.  
+**PWA-ready:** install as a native-like app on Android, iOS, and Windows — no app store needed.
+![PWA manual](https://raw.githubusercontent.com/Anilexis/openwrt-darkboard/main/PWA.md)  
 Passwords are stored locally in the browser (LocalStorage). Use the dashboard only on trusted devices!
 
 ---
@@ -117,7 +121,6 @@ MIT
 
 # DarkBoard - OpenWRT Dashboard в тёмной теме
 
-
 **🔥 [ДЕМО дашборда](https://Anilexis.github.io/openwrt-darkboard/demo.html) 🔥**
 ![Картинка](https://raw.githubusercontent.com/Anilexis/openwrt-darkboard/main/preview.png)
 
@@ -141,7 +144,10 @@ MIT
 | **WiFi AP** | Доступность внешней AP и ссылка на админку |
 | **Топбар** | Hostname, ядро, версия прошивки, аптайм, температура, часы |
 
-**Адаптивный:** 4 колонки (десктоп) → 2 колонки (планшет) → 1–2 колонки (телефон). PWA — можно добавить на главный экран.
+**Адаптивный:** 4 колонки (десктоп) → 3 колонки (планшет) → 2 колонки (телефон).  
+**PWA:** устанавливается как приложение на Android, iOS и Windows — без магазина приложений.
+![PWA мануал](https://raw.githubusercontent.com/Anilexis/openwrt-darkboard/main/PWA.md)  
+Пароли хранятся локально в браузере (LocalStorage). Используйте панель управления только на доверенных устройствах!
 
 ---
 
