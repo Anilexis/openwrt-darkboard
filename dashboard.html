@@ -1554,24 +1554,40 @@ async function render_wan_logs() {
       file_exec('/sbin/logread', ['-e', 'netifd']).then(r => r.stdout || '', () => ''),
     ]);
     if (!wanLogsActive) return;
+    const now = Date.now();
+    const fortyEightHours = 48 * 60 * 60 * 1000;
+    const keywords = ['wan', 'pppoe-wan', 'eth0'];
     const seen = new Set();
-    let lines = [];
-    for (const out of results) {
-      for (const l of out.split('\n')) {
-        const t = l.trim();
-        if (t && !seen.has(t)) { seen.add(t); lines.push(t); }
-      }
-    }
-    lines.sort();
-    if (lines.length > 30) lines = lines.slice(-30);
-    const lh = lines.length
-      ? lines.map(l => `<div class="log-line">${l.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>`).join('')
-      : '<div class="log-line" style="color:var(--text-faint)">no WAN logs found</div>';
+    let allLines = [];
+    results.forEach((stdout, index) => {
+      stdout.split('\n').forEach(line => {
+        const t = line.trim();
+        if (!t || seen.has(t)) return;
+        // 1. test for keywords
+        const hasKeyword = (index === 0) || keywords.some(k => t.toLowerCase().includes(k));        
+        if (hasKeyword) {
+          // 2. Test for time (OpenWRT log format: "Tue Apr 14 16:39:59 2026")
+          const dateMatch = t.match(/^[A-Z][a-z]{2}\s+[A-Z][a-z]{2}\s+\d+\s+\d{2}:\d{2}:\d{2}\s+\d{4}/);
+          if (dateMatch) {
+            const logDate = new Date(dateMatch[0]).getTime();
+            if (now - logDate > fortyEightHours) return; // Only for 48h new
+          }
+          seen.add(t);
+          allLines.push(t);
+        }
+      });
+    });
+    // Sort by time and slice 15 items
+    allLines.sort();
+    const finalLines = allLines.slice(-15);
+    const lh = finalLines.length
+      ? finalLines.map(l => `<div class="log-line">${l.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>`).join('')
+      : '<div class="log-line" style="color:var(--text-faint)">no recent WAN logs found</div>';
     if (!wanLogsActive) return;
     el.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;padding-bottom:2px;border-bottom:1px solid var(--border-2)">
-      <span style="font-size:var(--text-xs);color:var(--cyan)">&gt; logread -e ALERT-WAN</span>
+      <span style="font-size:var(--text-xs);color:var(--cyan)">Logs</span>
       <button onclick="refresh_wan_logs()" class="svc-action" title="Refresh">&#8635;</button>
-    </div><div>${lh}</div>`;
+    </div><div>${lh}</div>`;    
   } catch(e) {
     if (wanLogsActive)
       el.innerHTML = '<div class="met"><span class="ml err">error reading logs</span></div>';
