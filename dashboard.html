@@ -420,6 +420,7 @@ hr{border:none;border-top:1px solid var(--border);margin:2px 0;}
     <div class="panel cell-latency">
       <div class="ptitle">LATENCY
         <div class="ptitle-r">
+          <button class="svc-action" title="Refresh latency" id="lat-refresh-btn" onclick="refresh_ping(this)">&#8635;</button>
           <button class="svc-action" title="Configure latency pools" onclick="showLatencySettings()">&#9965;</button>
         </div>
       </div>
@@ -428,7 +429,11 @@ hr{border:none;border-top:1px solid var(--border);margin:2px 0;}
 
     <!-- R2 C3 - WAN -->
     <div class="panel cell-wan">
-      <div class="ptitle">WAN</div>
+      <div class="ptitle">WAN
+        <div class="ptitle-r">
+          <button class="svc-action" id="wan-log-btn" title="WAN logs" onclick="toggle_wan_logs(this)">&#9776;</button>
+        </div>
+      </div>
       <div class="si" id="wan-p"></div>
     </div>
 
@@ -535,6 +540,14 @@ hr{border:none;border-top:1px solid var(--border);margin:2px 0;}
       </div>
     </div>
 
+    <div class="modal-section">cake-stats</div>
+    <div class="modal-row">
+      <div class="modal-field">
+        <label>cake-stats port</label>
+        <input type="number" id="m-cake-stats-port" placeholder="11112" autocomplete="off">
+      </div>
+    </div>
+
     <div class="modal-section">WiFi Access Point (external AP)</div>
     <div class="modal-row">
       <div class="modal-field">
@@ -593,6 +606,7 @@ const DEFAULTS = {
   wifi_ap_port: 80,
   wifi_ap_https:false,
   ariangport: 6800,
+  cake_stats_port: 11112,
 };
 
 // Static client map: IP -> { type: 'pc'|'tv'|'ap'|'wifi', iface: 'ethN' }
@@ -626,6 +640,7 @@ const C = {
   wifi_ap_port:   DEFAULTS.wifi_ap_port,
   wifi_ap_https:  DEFAULTS.wifi_ap_https,
   ariangport:     DEFAULTS.ariangport,
+  cake_stats_port: DEFAULTS.cake_stats_port,
   fast:   2000,
   slow:   8000,
   vpn:    5000,
@@ -673,6 +688,7 @@ function apply_router_url(routerUrl) {
     if (s.wifi_ap_port)  C.wifi_ap_port  = parseInt(s.wifi_ap_port) || DEFAULTS.wifi_ap_port;
     if (s.wifi_ap_https !== undefined) C.wifi_ap_https = !!s.wifi_ap_https;
     if (s.ariangport)  C.ariangport  = parseInt(s.ariangport)  || DEFAULTS.ariangport;
+    if (s.cake_stats_port) C.cake_stats_port = parseInt(s.cake_stats_port) || DEFAULTS.cake_stats_port;
     C.luci_pass     = s.luci_pass     || '';
     C.mihomo_secret = s.mihomo_secret || '';
     C.adguard_pass  = s.adguard_pass  || '';
@@ -732,6 +748,16 @@ async function rebuild_topbar_links() {
     }
   } catch(e) {}
 
+  try {
+    const cake_port = C.cake_stats_port || DEFAULTS.cake_stats_port;
+    const cake_url  = 'http://' + host + ':' + cake_port;
+    const r_cs = await file_exec('/usr/bin/curl', ['-s', '-m', '2', '-o', '/dev/null', '-w', '%{http_code}', 'http://127.0.0.1:' + cake_port + '/']);
+    const code_cs = parseInt((r_cs.stdout || '').trim());
+    if (code_cs > 0 && code_cs < 600) {
+      html += `<a class="tb-link" href="${cake_url}" target="_blank" rel="noopener">cake-stats</a>`;
+    }
+  } catch(e) {}
+
   const ct = document.getElementById('tb-links-ct');
   if (ct) ct.innerHTML = html;
 
@@ -757,6 +783,7 @@ function modal_show(){
   $('m-wifiap-port').value  = s.wifi_ap_port    || C.wifi_ap_port || DEFAULTS.wifi_ap_port;
   $('m-wifiap-https').checked = s.wifi_ap_https !== undefined ? !!s.wifi_ap_https : C.wifi_ap_https;
   $('m-ariang-port').value = s.ariangport || C.ariangport || DEFAULTS.ariangport;
+  $('m-cake-stats-port').value = s.cake_stats_port || C.cake_stats_port || DEFAULTS.cake_stats_port;
   document.getElementById('setup-modal').classList.remove('hidden');
   setTimeout(() => $('m-router').focus(), 60);
 }
@@ -775,6 +802,7 @@ function modal_save(){
     wifi_ap_port:  parseInt($('m-wifiap-port').value) || DEFAULTS.wifi_ap_port,
     wifi_ap_https: $('m-wifiap-https').checked,
     ariangport: parseInt($('m-ariang-port').value) || DEFAULTS.ariangport,
+    cake_stats_port: parseInt($('m-cake-stats-port').value) || DEFAULTS.cake_stats_port,
   };
   localStorage.setItem('darkboard_creds', JSON.stringify(creds));
   // Apply to runtime config
@@ -785,6 +813,7 @@ function modal_save(){
   C.wifi_ap_port  = creds.wifi_ap_port;
   C.wifi_ap_https = creds.wifi_ap_https;
   C.ariangport = creds.ariangport;
+  C.cake_stats_port = creds.cake_stats_port;
   apply_router_url(creds.router);
   // Override mihomo_api with updated port
   C.mihomo_api    = 'http://' + C.adguard_host + ':' + C.mihomo_port;
@@ -1439,6 +1468,17 @@ async function update_ping() {
   for (const r of results) if (r.status === 'fulfilled' && r.value) latD[r.value.key] = r.value.ms;
   latTS = Date.now(); render_ping();
 }
+async function refresh_ping(btn) {
+  btn.classList.add('spinning');
+  btn.style.pointerEvents = 'none';
+  try {
+    await update_ping();
+  } finally {
+    btn.classList.remove('spinning');
+    btn.style.pointerEvents = '';
+  }
+}
+
 function render_ping() {
   let html = '';
   if (latTS > 0) {
@@ -1466,6 +1506,7 @@ function render_ping() {
 
 // ===== WAN INFO =====
 async function update_wan_info() {
+  if (wanLogsActive) return; // логи активны — не перезаписываем
   try {
     const ifd = await luci_call('network.interface', 'dump', {});
     _resolveWanDev(ifd); // cache WAN device name as a side effect
@@ -1488,6 +1529,56 @@ async function update_wan_info() {
     }
   } catch(e) {}
 }
+
+// ===== WAN LOGS =====
+let wanLogsActive = false;
+
+async function toggle_wan_logs(btn) {
+  wanLogsActive = !wanLogsActive;
+  if (wanLogsActive) {
+    btn.style.color = 'var(--cyan)';
+    await render_wan_logs();
+  } else {
+    btn.style.color = '';
+    update_wan_info();
+  }
+}
+
+async function render_wan_logs() {
+  if (!wanLogsActive) return;
+  const el = $('wan-p');
+  el.innerHTML = '<div class="met"><span class="ml" style="color:var(--text-faint)">loading WAN logs...</span></div>';
+  try {
+    const results = await Promise.all([
+      file_exec('/sbin/logread', ['-e', 'ALERT-WAN']).then(r => r.stdout || '', () => ''),
+      file_exec('/sbin/logread', ['-e', 'netifd']).then(r => r.stdout || '', () => ''),
+    ]);
+    if (!wanLogsActive) return;
+    const seen = new Set();
+    let lines = [];
+    for (const out of results) {
+      for (const l of out.split('\n')) {
+        const t = l.trim();
+        if (t && !seen.has(t)) { seen.add(t); lines.push(t); }
+      }
+    }
+    lines.sort();
+    if (lines.length > 30) lines = lines.slice(-30);
+    const lh = lines.length
+      ? lines.map(l => `<div class="log-line">${l.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>`).join('')
+      : '<div class="log-line" style="color:var(--text-faint)">no WAN logs found</div>';
+    if (!wanLogsActive) return;
+    el.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;padding-bottom:2px;border-bottom:1px solid var(--border-2)">
+      <span style="font-size:var(--text-xs);color:var(--cyan)">&gt; logread -e ALERT-WAN</span>
+      <button onclick="refresh_wan_logs()" class="svc-action" title="Refresh">&#8635;</button>
+    </div><div>${lh}</div>`;
+  } catch(e) {
+    if (wanLogsActive)
+      el.innerHTML = '<div class="met"><span class="ml err">error reading logs</span></div>';
+  }
+}
+
+function refresh_wan_logs() { render_wan_logs(); }
 
 // ===== SERVICE ACTIONS & LOGS =====
 let currentLogSvc = null;
