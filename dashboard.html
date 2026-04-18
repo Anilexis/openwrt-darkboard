@@ -333,14 +333,14 @@ hr{border:none;border-top:1px solid var(--border);margin:2px 0;}
 
   <!-- TOPBAR -->
   <div class="topbar">
-    <div class="tb-l">
+<div class="tb-l">
       <span class="tb-title">DarkBoard</span>
       <span class="tb-sep">|</span>
       <span id="tb-host">---</span>
       <span class="tb-sep">|</span>
-      <span id="tb-kernel" style="color:var(--text-muted)">kernel</span>
-      <span class="tb-sep">|</span>
       <span id="tb-fw" style="color:var(--text-muted)">--</span>
+      <span class="tb-sep">|</span>
+      <span id="tb-kernel" style="color:var(--text-muted)">kernel</span>
       <span class="tb-links" id="tb-links-ct">
         <!-- links are rebuilt dynamically by rebuild_topbar_links() -->
       </span>
@@ -1013,8 +1013,8 @@ async function update_board() {
   const r = await luci_call('system', 'board', {});
   const b = r?.[1]; if (!b) return;
   if (b.hostname) $('tb-host').textContent = b.hostname;
-  if (b.kernel) $('tb-kernel').textContent = 'kernel ' + b.kernel;
-  if (b.release?.version) $('tb-fw').textContent = b.release.version + ' ' + (b.release.revision || '');
+  if (b.kernel) $('tb-kernel').textContent = b.kernel;
+  if (b.release?.version) $('tb-fw').textContent = b.release.version;
 }
 
 // ===== CPU - /proc/stat always first, no realtime branch =====
