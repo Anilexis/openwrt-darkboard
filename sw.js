@@ -1,4 +1,4 @@
-const CACHE_NAME = 'darkboard-v0.1.3'; // Change the version when updating dashboard.html
+const CACHE_NAME = 'darkboard-v0.1.4'; // Change the version when updating dashboard.html
 
 const ASSETS = [
   './dashboard.html',
