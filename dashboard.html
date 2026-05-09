@@ -249,6 +249,11 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
   display:flex;align-items:center;gap:4px;
   padding:2px 0;border-bottom:1px solid var(--border);
   font-size:var(--text-xs);
+  cursor:pointer;
+  transition: background 0.15s;
+}
+.client-row:hover {
+  background: var(--surface-3);
 }
 .client-row:last-child{border-bottom:none;}
 .cicon{width:30px;text-align:left;flex-shrink:0;font-style:normal;font-size:var(--text-xxs);font-weight:700;}
@@ -657,6 +662,10 @@ let maxCT = 0;
 let maxLat = {};
 let ifaceSpdMap = {};
 let wanRxPrev = null, wanTxPrev = null, wanTsPrev = 0;
+let selectedClientData = null;
+let clientStatsPrev = null;
+let clientStatsTs = 0;
+let clientDetailTimer = null;
 
 // Helper: derive all dependent URLs from base router URL
 function apply_router_url(routerUrl) {
@@ -2026,18 +2035,129 @@ async function update_clients() {
       ? l.name
       : mac.toUpperCase().replace(/:/g, '').slice(0, 12);
 
-    html += `<div class="client-row">
+    html += `<div class="client-row" onclick="show_client_details('${l.ip}', '${mac}', '${displayName.replace(/'/g, "\\'")}', '${devType}', '${mapped ? mapped.iface : ''}')">
       <i class="cicon ${bandClass}" title="${devType}">${sym}</i>
       <span class="cname" title="${mac}">${displayName}</span>
       <span class="cip">${l.ip}</span>
     </div>`;
   }
 
-  $('clients-p').innerHTML = html;
+  if (!selectedClientData) {
+    $('clients-p').innerHTML = html;
+  }
+
   const bdg = $('cl-bdg');
   bdg.textContent = leases.length;
   bdg.className = 'badge b-ok';
   bdg.style.cssText = '';
+}
+
+function show_client_details(ip, mac, name, type, iface) {
+  selectedClientData = { ip, mac, name, type, iface };
+  $('clients-p').innerHTML = '<div class="met"><span class="ml muted">loading data...</span></div>';
+  update_client_details(); // trigger first render immediately
+  if (clientDetailTimer) clearInterval(clientDetailTimer);
+  clientDetailTimer = setInterval(update_client_details, 2000); // update every 2 seconds
+}
+
+function close_client_details() {
+  selectedClientData = null;
+  if (clientDetailTimer) clearInterval(clientDetailTimer);
+  update_clients(); // return to list immediately
+}
+
+async function update_client_details() {
+  if (!selectedClientData) return;
+  const { ip, mac, name, type, iface } = selectedClientData;
+  let rxTotal = 0, txTotal = 0, rxSpeed = 0, txSpeed = 0;
+  const now = Date.now();
+  let extraInfo = '';
+
+  // 1. Check ARP table to get client activity status
+  try {
+    const arp = await file_exec('/sbin/ip', ['neigh', 'show', ip]);
+    const out = (arp.stdout || '').trim();
+    if (out) {
+      const state = out.split(' ').pop(); // Usually REACHABLE, STALE, DELAY
+      const col = state === 'REACHABLE' ? 'var(--green)' : 'var(--text-muted)';
+      extraInfo += `<div class="ds"><span class="dl">activity (arp)</span><span class="dv" style="color:${col}">${state}</span></div>`;
+    }
+  } catch(e) {}
+
+  // 2. Get traffic. (Works fully for mapped eth ports)
+  if (iface && iface.startsWith('eth')) {
+     const r = await luci_call('network.device', 'status', {});
+     const devs = Array.isArray(r) ? r[1] : r?.[1];
+     if (devs && devs[iface]) {
+        const s = devs[iface].statistics || {};
+        // IMPORTANT: For the router, transmitted bytes (tx) are the client's download (rx), and vice versa.
+        rxTotal = s.tx_bytes || 0; 
+        txTotal = s.rx_bytes || 0; 
+     }
+  } else if (type === 'wifi' || type === 'ap') {
+     // 3. For Wi-Fi, extract channel speeds (PHY rate) via iwinfo
+     try {
+        const wifs = await file_exec('/bin/ls', ['/sys/class/net/']);
+        const names = (wifs.stdout || '').split('\n').map(s => s.trim()).filter(n => /^wl|^ath|^ra|^mt|^wlan/.test(n));
+        for (const wif of names) {
+           const r = await file_exec('/usr/bin/iwinfo', [wif, 'assoclist']);
+           const out = r.stdout || '';
+           const macUpper = mac.toUpperCase();
+           if (out.includes(macUpper)) {
+              extraInfo += `<div class="ds"><span class="dl">wifi iface</span><span class="dv">${wif}</span></div>`;
+              const block = out.split(macUpper)[1];
+              if (block) {
+                 const rateRx = block.match(/RX Rate:\s*([^\n]+)/i);
+                 const rateTx = block.match(/TX Rate:\s*([^\n]+)/i);
+                 if (rateRx) extraInfo += `<div class="ds"><span class="dl">rx PHY rate</span><span class="dv">${rateRx[1]}</span></div>`;
+                 if (rateTx) extraInfo += `<div class="ds"><span class="dl">tx PHY rate</span><span class="dv">${rateTx[1]}</span></div>`;
+              }
+              break;
+           }
+        }
+     } catch(e) {}
+  }
+
+  // Calculate speeds
+  if (rxTotal > 0 || txTotal > 0) {
+      if (clientStatsPrev && clientStatsPrev.ip === ip && clientStatsTs > 0) {
+          const dt = (now - clientStatsTs) / 1000;
+          if (dt > 0.5) {
+              rxSpeed = Math.max(0, (rxTotal - clientStatsPrev.rx) / dt);
+              txSpeed = Math.max(0, (txTotal - clientStatsPrev.tx) / dt);
+          }
+      }
+      clientStatsPrev = { ip, rx: rxTotal, tx: txTotal };
+      clientStatsTs = now;
+  }
+
+  if (selectedClientData?.ip !== ip) return; // Guard: if the user closed the card while await was pending
+
+  // Build card HTML
+  let h = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;padding-bottom:2px;border-bottom:1px solid var(--border-2)">
+    <span style="font-size:var(--text-xs);color:var(--cyan)">&gt; ${name}</span>
+    <button onclick="close_client_details()" class="svc-action" style="color:var(--red)" title="Close">&#10005;</button>
+  </div>`;
+
+  h += `<div class="ds"><span class="dl">IP</span><span class="dv ok">${ip}</span></div>`;
+  h += `<div class="ds"><span class="dl">MAC</span><span class="dv" style="font-family:var(--font-mono);color:var(--text-muted)">${mac.toUpperCase()}</span></div>`;
+  h += `<div class="ds"><span class="dl">type</span><span class="dv">${type.toUpperCase()} ${iface ? '('+iface+')' : ''}</span></div>`;
+
+  if (extraInfo) h += extraInfo;
+
+  if (rxTotal > 0 || txTotal > 0) {
+      h += `<hr>`;
+      h += `<div class="ds"><span class="dl">download / upload</span><span class="dv" style="font-size:var(--text-xxs)">
+        <span style="color:var(--cyan)">\u2193${fmt_sz(rxTotal)}</span> <span style="color:var(--orange)">\u2191${fmt_sz(txTotal)}</span>
+      </span></div>`;
+      h += `<div class="ds"><span class="dl">speed</span><span class="dv" style="font-size:var(--text-xxs)">
+        <span style="color:var(--cyan)">\u2193${fmt_b(rxSpeed)}</span> <span style="color:var(--orange)">\u2191${fmt_b(txSpeed)}</span>
+      </span></div>`;
+  } else if (!iface || !iface.startsWith('eth')) {
+     h += `<div class="ds" style="margin-top:4px"><span class="dl" style="color:var(--text-faint);white-space:normal;line-height:1.2">Byte statistics are only available for ports in CLIENT_MAP</span></div>`;
+  }
+
+  $('clients-p').innerHTML = h;
 }
 
 // ===== WIFI AP / LOCAL WIRELESS =====
