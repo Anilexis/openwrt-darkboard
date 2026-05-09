@@ -1360,7 +1360,16 @@ async function update_net(prefetched) {
       if (etxEl) { etxEl.textContent = '↑' + tr; etxEl.className = `tx ${txCls}`; }
     }
     const ee = $('ife-' + name); if (ee) ee.textContent = (erx > 0 || etx > 0) ? ' err:' + (erx + etx) : '';
-    const et = $('ift-' + name); if (et) et.textContent = fmt_sz(rx) + '/' + fmt_sz(tx);
+
+    const et = $('ift-' + name);
+    if (et) {
+      if (isLan) {
+        et.textContent = fmt_sz(tx) + '/' + fmt_sz(rx);
+      } else {
+        et.textContent = fmt_sz(rx) + '/' + fmt_sz(tx);
+      }
+    }
+
   }
   $('ct-bdg').textContent = 'ct: ' + ($('ct-act').textContent || '--');
   for (const k in pNet) if (!devs[k]) delete pNet[k];
