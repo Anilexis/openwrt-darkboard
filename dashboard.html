@@ -2107,13 +2107,33 @@ async function update_clients() {
     known.add(ip);
   }
 
-  // Enrich names from hostname maps
+// Enrich names, filter out IPv6, and deduplicate IPv4
+  window.CLIENT_IPV6 = {}; // Global storage for IPv6
+  const uniqueV4 = new Map();
+
   for (const l of leases) {
+    const mac = (l.mac || '').toLowerCase();
     if (!l.name || l.name === '*') {
-      const mac = (l.mac || '').toLowerCase();
       l.name = macNameMap[mac] || ipNameMap[l.ip] || '';
     }
+    
+    // If IPv6
+    if (l.ip.includes(':')) {
+      if (mac) {
+        if (!window.CLIENT_IPV6[mac]) window.CLIENT_IPV6[mac] = new Set();
+        window.CLIENT_IPV6[mac].add(l.ip);
+      }
+    } else {
+      // IPv4
+      if (!uniqueV4.has(l.ip)) {
+         uniqueV4.set(l.ip, l);
+      } else {
+         if (l.name && l.name !== '*') uniqueV4.get(l.ip).name = l.name;
+      }
+    }
   }
+  
+  leases = Array.from(uniqueV4.values());
 
   if (!leases.length) {
     $('clients-p').innerHTML = '<div class="met"><span class="ml" style="color:var(--text-faint)">no leases</span></div>';
@@ -2304,6 +2324,14 @@ async function update_client_details() {
 
   h += `<div class="ds"><span class="dl">IP</span><span class="dv ok">${ip}</span></div>`;
   h += `<div class="ds"><span class="dl">MAC</span><span class="dv" style="font-family:var(--font-mono);color:var(--text-muted)">${mac.toUpperCase()}</span></div>`;
+  
+  // Adding IPv6
+  if (window.CLIENT_IPV6 && window.CLIENT_IPV6[mac.toLowerCase()]) {
+      Array.from(window.CLIENT_IPV6[mac.toLowerCase()]).forEach(v6 => {
+          h += `<div class="ds"><span class="dl">IPv6</span><span class="dv" style="font-size:var(--text-xxs);color:var(--text-faint)">${v6}</span></div>`;
+      });
+  }
+
   h += `<div class="ds"><span class="dl">type</span><span class="dv">${type.toUpperCase()} ${iface ? '('+iface+')' : ''}</span></div>`;
 
   if (extraInfo) {
@@ -2410,15 +2438,21 @@ async function update_wifi_ap() {
               // 2. AP Hostname (from SNMP)
               // 3. Fallback to just IP
               const ipSuffix = ip.split('.').pop();
-              let displayName = ip;
+              let namePart = ip;
+              let ipPart = '';
+
               if (CLIENT_MAP[ip] && CLIENT_MAP[ip].name) {
-                  displayName = ipSuffix + ': ' + CLIENT_MAP[ip].name;
+                  namePart = CLIENT_MAP[ip].name;
+                  ipPart = '.' + ipSuffix;
               } else if (apHostname && apHostname !== '*' && apHostname !== '?') {
-                  displayName = ipSuffix + ': ' + apHostname;
+                  namePart = apHostname;
+                  ipPart = '.' + ipSuffix;
               }
 
               html += `<div class="wrow" style="margin-top:2px;">
-                <span class="wlabel" title="${mac}" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:65%">${displayName}</span>
+                <span class="wlabel" title="${mac}" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:65%">
+                  ${ipPart ? `<span style="color:var(--text-faint);margin-right:4px">${ipPart}</span>` : ''}${namePart}
+                </span>
                 <span class="wval" style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
                   <span style="color:var(--text-faint); font-size:var(--text-xxs)">${band}</span>
                   <div class="sig-bars lvl-${lvl}"><div class="b1"></div><div class="b2"></div><div class="b3"></div></div>
