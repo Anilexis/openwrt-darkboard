@@ -111,6 +111,25 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .b-err{background:var(--red-dim);color:var(--red);}
 .b-cyan{background:var(--cyan-dim);color:var(--cyan);}
 
+/* ============================================================ INTERFACES */
+.if-role-box { display: flex; gap: 4px; align-items: center; }
+.role-btn {
+  font-size: var(--text-xxs);
+  padding: 1px 4px;
+  border: 1px solid var(--border-2);
+  border-radius: 2px;
+  color: var(--text-faint);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.role-btn:hover { border-color: var(--cyan); color: var(--text-muted); }
+.role-btn.active {
+  background: var(--cyan-dim);
+  color: var(--cyan);
+  border-color: var(--cyan);
+  font-weight: 700;
+}
+
 /* ============================================================ METRIC */
 .met{display:flex;align-items:baseline;justify-content:space-between;gap:8px;font-size:var(--text-sm);line-height:1.3;}
 .ml{color:var(--text-muted);white-space:nowrap;flex-shrink:0;}
@@ -417,7 +436,12 @@ hr{border:none;border-top:1px solid var(--border);margin:2px 0;}
 
     <!-- R2 C1 - INTERFACES -->
     <div class="panel cell-interfaces">
-      <div class="ptitle">INTERFACES <span style="font-size:var(--text-xs);color:var(--text-faint)" id="ct-bdg">ct: --</span></div>
+      <div class="ptitle">
+        INTERFACES <span style="font-size:var(--text-xs);color:var(--text-faint)" id="ct-bdg">ct: --</span>
+        <div class="ptitle-r">
+          <button class="svc-action" id="iface-edit-btn" title="Setup Roles" onclick="toggleIfaceEdit()">&#9881;</button>
+        </div>
+      </div>
       <div class="si" id="net-p"></div>
     </div>
 
@@ -1295,14 +1319,18 @@ async function update_link_speeds() {
 let _netSkelKey = '';
 async function update_net(prefetched) {
   const r = prefetched?.net_dev ?? await luci_call('network.device', 'status', {});
-  const devs = Array.isArray(r) ? r[1] : r?.[1]; if (!devs) return;
+  const devs = Array.isArray(r) ? r[1] : r?.[1]; 
+  if (!devs) return;
+  
   const now = Date.now();
   ifaceSpdMap = {};
   const entries = Object.entries(devs)
     .filter(([n]) => /^eth\d/.test(n))
     .sort(([a], [b]) => a.localeCompare(b));
+
   // Rebuild skeleton only when interface list changes
-  const skelKey = entries.map(([n]) => n).join(',');
+  const skelKey = entries.map(([n]) => n).join(',') + (ifaceEditMode ? ':edit' : '');
+  
   if (skelKey !== _netSkelKey) {
     _netSkelKey = skelKey;
     let html = '';
@@ -1316,15 +1344,19 @@ async function update_net(prefetched) {
     }
     $('net-p').innerHTML = html || '<div class="met"><span class="ml muted">no interfaces</span></div>';
   }
+
   for (const [name, d] of entries) {
     const s = d.statistics || {};
     const rx = s.rx_bytes || 0, tx = s.tx_bytes || 0;
     const up = /^eth/.test(name) ? !!(d.carrier) : !!(d.up || d.carrier || (d.flags && d.flags.up));
+    
     let spd = Number(d.speed) || 0;
     if (spd <= 0) spd = Number(d['link-speed']) || Number(d['carrier-speed']) || 0;
     if (spd <= 0 && linkSpeeds[name]) spd = linkSpeeds[name];
+    
     const spdStr = spd > 0 ? (spd >= 1000 ? (spd / 1000).toFixed(spd % 1000 ? 1 : 0) + 'G' : spd + 'M') : '';
     if (spdStr && up) ifaceSpdMap[name] = spdStr;
+    
     let rr = '--', tr = '--', rxRate = 0, txRate = 0;
     if (pNet[name]) {
       const dt = (now - pNet[name].ts) / 1000;
@@ -1335,44 +1367,86 @@ async function update_net(prefetched) {
       }
     }
     pNet[name] = { rx, tx, ts: now };
+    
     const erx = s.rx_errors || 0, etx = s.tx_errors || 0;
-    let rxCls = 'rx-dim', txCls = 'tx-dim';
-    if (rxRate >= 25e6) rxCls = 'rx-hi';
-    else if (rxRate >= 5e6) rxCls = 'rx-mid';
-    else if (rxRate >= 1e6) rxCls = 'rx-lo';
-    if (txRate >= 25e6) txCls = 'tx-hi';
-    else if (txRate >= 5e6) txCls = 'tx-mid';
-    else if (txRate >= 1e6) txCls = 'tx-lo';
-    // Update only text/class — no innerHTML rebuild
+
+    // --- EDIT MODE ---
+    if (ifaceEditMode) {
+      const isLan = IFACE_ROLES[name] === 'lan';
+      const roleHtml = `
+        <div class="ifr1">
+          <span class="ifname ${up ? 'up' : 'down'}">${name}</span>
+          <div class="if-role-box" style="margin-left:auto">
+            <span id="role-wan-${name}" class="role-btn ${!isLan ? 'active' : ''}" onclick="setIfaceRole('${name}','wan')">WAN</span>
+            <span id="role-lan-${name}" class="role-btn ${isLan ? 'active' : ''}" onclick="setIfaceRole('${name}','lan')">LAN</span>
+          </div>
+        </div>
+        <div class="ifr2" style="color:var(--text-faint); font-size:var(--text-xxs)">Configure interface behavior</div>
+      `;
+      const container = $('if-' + name);
+      if (container) container.innerHTML = roleHtml;
+      continue; 
+    }
+
+    // --- VIEW MODE ---
+    const isLan = IFACE_ROLES[name] === 'lan';
+    
+    // Helper to determine color intensity suffix
+    const getSfx = (rate) => (rate >= 25e6 ? 'hi' : rate >= 5e6 ? 'mid' : rate >= 1e6 ? 'lo' : 'dim');
+
+    const erxEl = $(`ifrx-${name}`);
+    const etxEl = $(`iftx-${name}`);
+    const et = $(`ift-${name}`);
+
+    if (isLan) {
+      // LAN: Client Download is Router TX (Cyan color)
+      if (erxEl) { erxEl.textContent = '↓' + tr; erxEl.className = `rx rx-${getSfx(txRate)}`; }
+      // LAN: Client Upload is Router RX (Orange color)
+      if (etxEl) { etxEl.textContent = '↑' + rr; etxEl.className = `tx tx-${getSfx(rxRate)}`; }
+      // Display Volume: Download / Upload
+      if (et) et.textContent = fmt_sz(tx) + '/' + fmt_sz(rx);
+    } else {
+      // WAN: Router Download is Router RX (Cyan color)
+      if (erxEl) { erxEl.textContent = '↓' + rr; erxEl.className = `rx rx-${getSfx(rxRate)}`; }
+      // WAN: Router Upload is Router TX (Orange color)
+      if (etxEl) { etxEl.textContent = '↑' + tr; etxEl.className = `tx tx-${getSfx(txRate)}`; }
+      // Display Volume: Download / Upload
+      if (et) et.textContent = fmt_sz(rx) + '/' + fmt_sz(tx);
+    }
+
+    // Update generic status fields
     const en = $('ifn-' + name); if (en) { en.textContent = name; en.className = 'ifname ' + (up ? 'up' : 'down'); }
     const es = $('ifs-' + name); if (es) es.textContent = spdStr;
     const el = $('ifl-' + name); if (el) el.textContent = up ? 'UP' : 'DOWN';
-    const erxEl = $(`ifrx-${name}`);
-    const etxEl = $(`iftx-${name}`);
-    const isLan = LAN_IFACES.has(name);
-    if (isLan) {
-      // LAN: on the left (ifrx) we show download (router tx = cyan), on the right (iftx) — upload (router rx = orange)
-      if (erxEl) { erxEl.textContent = '↓' + tr; erxEl.className = `rx ${txCls}`; }
-      if (etxEl) { etxEl.textContent = '↑' + rr; etxEl.className = `tx ${rxCls}`; }
-    } else {
-      // WAN and others: unchanged
-      if (erxEl) { erxEl.textContent = '↓' + rr; erxEl.className = `rx ${rxCls}`; }
-      if (etxEl) { etxEl.textContent = '↑' + tr; etxEl.className = `tx ${txCls}`; }
-    }
     const ee = $('ife-' + name); if (ee) ee.textContent = (erx > 0 || etx > 0) ? ' err:' + (erx + etx) : '';
-
-    const et = $('ift-' + name);
-    if (et) {
-      if (isLan) {
-        et.textContent = fmt_sz(tx) + '/' + fmt_sz(rx);
-      } else {
-        et.textContent = fmt_sz(rx) + '/' + fmt_sz(tx);
-      }
-    }
-
   }
+
   $('ct-bdg').textContent = 'ct: ' + ($('ct-act').textContent || '--');
   for (const k in pNet) if (!devs[k]) delete pNet[k];
+}
+
+// ===== INTERFACES =====
+
+let ifaceEditMode = false;
+let IFACE_ROLES = JSON.parse(localStorage.getItem('darkboard_iface_roles') || '{}');
+
+function toggleIfaceEdit() {
+  ifaceEditMode = !ifaceEditMode;
+  const btn = $('iface-edit-btn');
+  btn.style.color = ifaceEditMode ? 'var(--cyan)' : '';
+  _netSkelKey = ''; 
+  update_net();
+}
+
+function setIfaceRole(name, role) {
+  IFACE_ROLES[name] = role;
+  localStorage.setItem('darkboard_iface_roles', JSON.stringify(IFACE_ROLES));
+  const wanBtn = $(`role-wan-${name}`);
+  const lanBtn = $(`role-lan-${name}`);
+  if (wanBtn && lanBtn) {
+    wanBtn.className = 'role-btn' + (role === 'wan' ? ' active' : '');
+    lanBtn.className = 'role-btn' + (role === 'lan' ? ' active' : '');
+  }
 }
 
 // ===== WAN TRAFFIC (topbar) =====
@@ -2063,16 +2137,15 @@ async function update_clients() {
 
 function show_client_details(ip, mac, name, type, iface) {
   selectedClientData = { ip, mac, name, type, iface };
-  $('clients-p').innerHTML = '<div class="met"><span class="ml muted">loading data...</span></div>';
-  update_client_details(); // trigger first render immediately
-  if (clientDetailTimer) clearInterval(clientDetailTimer);
-  clientDetailTimer = setInterval(update_client_details, 2000); // update every 2 seconds
+  $('clients-p').innerHTML = '<div class="met"><span class="ml muted">loading data...</span></div>';  
+  if (clientDetailTimer) clearTimeout(clientDetailTimer);
+  update_client_details(); // Trigger first render immediately
 }
 
 function close_client_details() {
   selectedClientData = null;
-  if (clientDetailTimer) clearInterval(clientDetailTimer);
-  update_clients(); // return to list immediately
+  if (clientDetailTimer) clearTimeout(clientDetailTimer);
+  update_clients(); // Return to list immediately
 }
 
 async function update_client_details() {
@@ -2140,7 +2213,8 @@ async function update_client_details() {
       clientStatsTs = now;
   }
 
-  if (selectedClientData?.ip !== ip) return; // Guard: if the user closed the card while await was pending
+  // Guard: if the user closed the card while await was pending
+  if (selectedClientData?.ip !== ip) return; 
 
   // Build card HTML
   let h = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;padding-bottom:2px;border-bottom:1px solid var(--border-2)">
@@ -2167,6 +2241,9 @@ async function update_client_details() {
   }
 
   $('clients-p').innerHTML = h;
+
+  // Schedule the next update only after the current render is complete
+  clientDetailTimer = setTimeout(update_client_details, 2000); 
 }
 
 // ===== WIFI AP / LOCAL WIRELESS =====
