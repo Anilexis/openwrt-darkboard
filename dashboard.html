@@ -295,6 +295,29 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .wlink{color:var(--text-faint);text-decoration:none;font-size:var(--text-xxs);}
 .wlink:hover{color:var(--cyan);}
 
+/* Signal strength bars */
+.sig-bars {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 1px;
+  height: 10px;
+  width: 12px;
+  margin-left: 5px;
+}
+.sig-bars div {
+  width: 3px;
+  background: var(--border-2);
+  border-radius: 1px;
+}
+.sig-bars .b1 { height: 40%; }
+.sig-bars .b2 { height: 70%; }
+.sig-bars .b3 { height: 100%; }
+
+/* Color states for signal bars */
+.sig-bars.lvl-3 .b1, .sig-bars.lvl-3 .b2, .sig-bars.lvl-3 .b3 { background: var(--green); }
+.sig-bars.lvl-2 .b1, .sig-bars.lvl-2 .b2 { background: var(--yellow); }
+.sig-bars.lvl-1 .b1 { background: var(--red); }
+
 /* ============================================================ SHARED */
 hr{border:none;border-top:1px solid var(--border);margin:2px 0;}
 .si{flex:1;overflow-y:auto;overflow-x:hidden;scrollbar-width:none;min-height:0;}
@@ -2155,29 +2178,40 @@ async function update_client_details() {
   const now = Date.now();
   let extraInfo = '';
 
-  // 1. Check ARP table to get client activity status
+  // 1. Get Active Connections Count (Conntrack)
+  try {
+    const ct = await file_exec('/bin/grep', ['-c', ip, '/proc/net/nf_conntrack']);
+    const count = parseInt((ct.stdout || '').trim());
+    if (!isNaN(count) && count > 0) {
+      const color = count > 300 ? 'var(--red)' : count > 100 ? 'var(--yellow)' : 'var(--cyan)';
+      extraInfo += `<div class="ds"><span class="dl">active conns</span><span class="dv" style="color:${color}">${count}</span></div>`;
+    }
+  } catch(e) {}
+
+  // 2. Check ARP table
   try {
     const arp = await file_exec('/sbin/ip', ['neigh', 'show', ip]);
     const out = (arp.stdout || '').trim();
     if (out) {
-      const state = out.split(' ').pop(); // Usually REACHABLE, STALE, DELAY
+      const state = out.split(' ').pop(); 
       const col = state === 'REACHABLE' ? 'var(--green)' : 'var(--text-muted)';
-      extraInfo += `<div class="ds"><span class="dl">activity (arp)</span><span class="dv" style="color:${col}">${state}</span></div>`;
+      extraInfo += `<div class="ds"><span class="dl">arp state</span><span class="dv" style="color:${col}">${state}</span></div>`;
     }
   } catch(e) {}
 
-  // 2. Get traffic. (Works fully for mapped eth ports)
+  // 3. Get traffic byte counters
   if (iface && iface.startsWith('eth')) {
      const r = await luci_call('network.device', 'status', {});
      const devs = Array.isArray(r) ? r[1] : r?.[1];
      if (devs && devs[iface]) {
         const s = devs[iface].statistics || {};
-        // IMPORTANT: For the router, transmitted bytes (tx) are the client's download (rx), and vice versa.
         rxTotal = s.tx_bytes || 0; 
         txTotal = s.rx_bytes || 0; 
      }
   } else if (type === 'wifi' || type === 'ap') {
-     // 3. For Wi-Fi, extract channel speeds (PHY rate) via iwinfo
+     let localWifiFound = false;
+
+     // 4A. Try local Wi-Fi via iwinfo
      try {
         const wifs = await file_exec('/bin/ls', ['/sys/class/net/']);
         const names = (wifs.stdout || '').split('\n').map(s => s.trim()).filter(n => /^wl|^ath|^ra|^mt|^wlan/.test(n));
@@ -2186,18 +2220,67 @@ async function update_client_details() {
            const out = r.stdout || '';
            const macUpper = mac.toUpperCase();
            if (out.includes(macUpper)) {
-              extraInfo += `<div class="ds"><span class="dl">wifi iface</span><span class="dv">${wif}</span></div>`;
+              localWifiFound = true;
+              extraInfo += `<div class="ds"><span class="dl">wifi iface</span><span class="dv" style="color:var(--text-faint)">${wif}</span></div>`;
               const block = out.split(macUpper)[1];
               if (block) {
+                 const firstLine = block.split('\n')[0];
+                 const sigMatch = firstLine.match(/([-\d]+\s*dBm)/);
+                 const inactiveMatch = firstLine.match(/(\d+\s*ms\s*ago)/i);
+                 if (sigMatch) extraInfo += `<div class="ds"><span class="dl">signal</span><span class="dv">${sigMatch[1]}</span></div>`;
+                 if (inactiveMatch) extraInfo += `<div class="ds"><span class="dl">inactive time</span><span class="dv">${inactiveMatch[1]}</span></div>`;
+
                  const rateRx = block.match(/RX Rate:\s*([^\n]+)/i);
                  const rateTx = block.match(/TX Rate:\s*([^\n]+)/i);
-                 if (rateRx) extraInfo += `<div class="ds"><span class="dl">rx PHY rate</span><span class="dv">${rateRx[1]}</span></div>`;
-                 if (rateTx) extraInfo += `<div class="ds"><span class="dl">tx PHY rate</span><span class="dv">${rateTx[1]}</span></div>`;
+                 if (rateRx) extraInfo += `<div class="ds"><span class="dl">rx PHY rate</span><span class="dv" style="color:var(--text-muted)">${rateRx[1]}</span></div>`;
+                 if (rateTx) extraInfo += `<div class="ds"><span class="dl">tx PHY rate</span><span class="dv" style="color:var(--text-muted)">${rateTx[1]}</span></div>`;
               }
               break;
            }
         }
      } catch(e) {}
+
+// 4B. Try External AP via SNMP
+     if (!localWifiFound && C.wifi_ap) {
+         try {
+             const snmp = await file_exec('/usr/bin/snmpwalk', [
+                 '-Ovq', '-v', '2c', '-c', 'public', C.wifi_ap, 'NET-SNMP-EXTEND-MIB::nsExtendOutputFull."wifidetails"'
+             ]);
+             const out = (snmp.stdout || '').trim();
+             if (out) {
+                 const lines = out.split('\n');
+                 for (const line of lines) {
+                     const parts = line.trim().split(/\s+/);
+                     // Format: MAC IP BAND [NAME(S)...] SIGNAL
+                     if (parts.length >= 4 && parts[0].toUpperCase() === mac.toUpperCase()) {
+                         const band = parts[2];
+                         let apHostname = '';
+                         let sigStr = '';
+                         
+                         // Smart parsing to handle spaces in hostnames
+                         if (parts.length >= 5) {
+                             apHostname = parts.slice(3, parts.length - 1).join(' ');
+                             sigStr = parts[parts.length - 1];
+                         } else {
+                             sigStr = parts[3]; // Fallback if no name provided
+                         }
+                         
+                         const sigNum = parseInt(sigStr);
+                         let sigColor = 'var(--text)';
+                         if (!isNaN(sigNum)) sigColor = sigNum >= -60 ? 'var(--green)' : sigNum >= -75 ? 'var(--yellow)' : 'var(--red)';
+                         
+                         extraInfo += `<div class="ds"><span class="dl">external ap</span><span class="dv" style="color:var(--text-faint)">${C.wifi_ap}</span></div>`;
+                         extraInfo += `<div class="ds"><span class="dl">band</span><span class="dv">${band}</span></div>`;
+                         if (apHostname && apHostname !== '*' && apHostname !== '?') {
+                             extraInfo += `<div class="ds"><span class="dl">ap hostname</span><span class="dv" style="color:var(--text-muted)">${apHostname}</span></div>`;
+                         }
+                         extraInfo += `<div class="ds"><span class="dl">signal</span><span class="dv" style="color:${sigColor}">${sigStr} dBm</span></div>`;
+                         break;
+                     }
+                 }
+             }
+         } catch(e) {}
+     }
   }
 
   // Calculate speeds
@@ -2213,7 +2296,6 @@ async function update_client_details() {
       clientStatsTs = now;
   }
 
-  // Guard: if the user closed the card while await was pending
   if (selectedClientData?.ip !== ip) return; 
 
   // Build card HTML
@@ -2226,7 +2308,7 @@ async function update_client_details() {
   h += `<div class="ds"><span class="dl">MAC</span><span class="dv" style="font-family:var(--font-mono);color:var(--text-muted)">${mac.toUpperCase()}</span></div>`;
   h += `<div class="ds"><span class="dl">type</span><span class="dv">${type.toUpperCase()} ${iface ? '('+iface+')' : ''}</span></div>`;
 
-  if (extraInfo) h += extraInfo;
+  if (extraInfo) { h += `<hr>`; h += extraInfo; }
 
   if (rxTotal > 0 || txTotal > 0) {
       h += `<hr>`;
@@ -2241,8 +2323,6 @@ async function update_client_details() {
   }
 
   $('clients-p').innerHTML = h;
-
-  // Schedule the next update only after the current render is complete
   clientDetailTimer = setTimeout(update_client_details, 2000); 
 }
 
@@ -2263,63 +2343,108 @@ async function init_wifi_admin_link() {
 
 async function update_wifi_ap() {
   const ap = C.wifi_ap;
+  const bdg = $('wifi-bdg');
 
   if (ap) {
     let reachable = false;
     try {
-      let r = await file_exec('/bin/ping', ['-c', '1', '-W', '2', ap]);
-      if (!r?.stdout) r = await file_exec('/usr/bin/ping', ['-c', '1', '-W', '2', ap]);
-      if ((r?.stdout || '').includes('0% packet loss') || (r?.stdout || '').includes('1 received')) reachable = true;
+      let r = await file_exec('/bin/ping', ['-c', '1', '-W', '1', ap]);
+      if ((r?.stdout || '').includes('1 received')) reachable = true;
     } catch(e) {}
-    if (!reachable) {
-      try {
-        const proto = C.wifi_ap_https ? 'https' : 'http';
-        const port = C.wifi_ap_port || (C.wifi_ap_https ? '443' : '80');
-        const r = await file_exec('/usr/bin/curl', ['-s', '-k', '-m', '2', '-o', '/dev/null', '-w', '%{http_code}', proto + '://' + ap + ':' + port + '/']);
-        const code = parseInt((r.stdout || '').trim());
-        if (code > 0 && code < 600) reachable = true;
-      } catch(e) {}
-    }
 
-    const bdg = $('wifi-bdg');
     bdg.textContent = reachable ? 'ONLINE' : 'OFFLINE';
     bdg.className = 'badge ' + (reachable ? 'b-ok' : 'b-err');
     bdg.style.cssText = '';
 
     const proto = C.wifi_ap_https ? 'https' : 'http';
     const port = C.wifi_ap_port || 80;
+    
     let html = `<div class="wifi-section">
-    <div class="wifi-sh">
-      <span class="wifi-sname">WiFi AP</span>
-      <span class="${reachable ? 'sstatus ok' : 'sstatus err'}">${reachable ? '\u2022 up' : '\u2022 down'}</span>
-    </div>
-    <div class="wrow"><span class="wlabel">IP</span><span class="wval">${ap}</span></div>
-    <div class="wrow"><span class="wlabel">mode</span><span class="wval">Access Point</span></div>`;
-    html += `<div class="wrow"><span class="wlabel">admin</span>
-      <a class="wlink" href="${proto}://${ap}${port !== 80 ? ':' + port : ''}/" target="_blank" rel="noopener">:${port} \u2197</a>
+      <div class="wifi-sh">
+        <span class="wifi-sname">External AP</span>
+        <span class="${reachable ? 'sstatus ok' : 'sstatus err'}">${reachable ? '\u2022 up' : '\u2022 down'}</span>
+      </div>
+      <div class="wrow"><span class="wlabel">IP</span><span class="wval">${ap}</span></div>
+      <div class="wrow"><span class="wlabel">admin</span>
+        <a class="wlink" href="${proto}://${ap}${port !== 80 ? ':' + port : ''}/" target="_blank" rel="noopener">:${port} \u2197</a>
+      </div>
     </div>`;
-    html += `</div>`;
+
+    if (reachable) {
+      try {
+        const snmp = await file_exec('/usr/bin/snmpwalk', [
+          '-Ovq', '-v', '2c', '-c', 'public', ap, 'NET-SNMP-EXTEND-MIB::nsExtendOutputFull."wifidetails"'
+        ]);
+        const out = (snmp.stdout || '').trim();
+        if (out) {
+          html += `<div class="wifi-section"><div class="wifi-sh"><span class="wifi-sname" style="font-size:var(--text-xxs);color:var(--text-faint)">Connected Clients</span></div>`;
+          const lines = out.split('\n');
+          for (const line of lines) {
+            const p = line.trim().split(/\s+/);
+            if (p.length >= 4) {
+              const mac = p[0].toLowerCase();
+              const ip = p[1];
+              const band = p[2];
+              
+              let apHostname = '';
+              let sigStr = '';
+              
+              // Smart parsing for optional hostname
+              if (p.length >= 5) {
+                  apHostname = p.slice(3, p.length - 1).join(' ');
+                  sigStr = p[p.length - 1];
+              } else {
+                  sigStr = p[3];
+              }
+              
+              const sig = parseInt(sigStr);
+
+              let lvl = 0;
+              if (sig >= -60) lvl = 3;
+              else if (sig >= -75) lvl = 2;
+              else if (sig >= -90) lvl = 1;
+
+              // Display Name Priority: 
+              // 1. CLIENT_MAP (static config)
+              // 2. AP Hostname (from SNMP)
+              // 3. Fallback to just IP
+              const ipSuffix = ip.split('.').pop();
+              let displayName = ip;
+              if (CLIENT_MAP[ip] && CLIENT_MAP[ip].name) {
+                  displayName = ipSuffix + ': ' + CLIENT_MAP[ip].name;
+              } else if (apHostname && apHostname !== '*' && apHostname !== '?') {
+                  displayName = ipSuffix + ': ' + apHostname;
+              }
+
+              html += `<div class="wrow" style="margin-top:2px;">
+                <span class="wlabel" title="${mac}" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:65%">${displayName}</span>
+                <span class="wval" style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
+                  <span style="color:var(--text-faint); font-size:var(--text-xxs)">${band}</span>
+                  <div class="sig-bars lvl-${lvl}"><div class="b1"></div><div class="b2"></div><div class="b3"></div></div>
+                </span>
+              </div>`;
+            }
+          }
+          html += `</div>`;
+        }
+      } catch(e) {}
+    }
 
     html += await _wifi_local_radios(false);
     $('wifi-p').innerHTML = html;
     return;
   }
 
-  const bdg = $('wifi-bdg');
-  let html = '';
   const radios = await _wifi_local_radios(true);
   if (radios) {
     bdg.textContent = 'LOCAL';
     bdg.className = 'badge b-cyan';
-    bdg.style.cssText = '';
-    html = radios;
+    $('wifi-p').innerHTML = radios;
   } else {
     bdg.textContent = 'N/A';
     bdg.className = 'badge';
-    bdg.style.cssText = 'background:var(--surface-3);color:var(--text-muted)';
-    html = '<div class="met"><span class="ml muted">no wireless detected</span></div>';
+    $('wifi-p').innerHTML = '<div class="met"><span class="ml muted">no wireless detected</span></div>';
   }
-  $('wifi-p').innerHTML = html;
 }
 
 async function _wifi_local_radios(fullMode) {
