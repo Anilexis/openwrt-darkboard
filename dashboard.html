@@ -2182,8 +2182,8 @@ async function update_client_details() {
   try {
     const ct = await file_exec('/bin/grep', ['-c', ip, '/proc/net/nf_conntrack']);
     const count = parseInt((ct.stdout || '').trim());
-    if (!isNaN(count) && count > 0) {
-      const color = count > 300 ? 'var(--red)' : count > 100 ? 'var(--yellow)' : 'var(--cyan)';
+    if (!isNaN(count)) { // Выводим всегда, даже если 0
+      const color = count > 300 ? 'var(--red)' : count > 100 ? 'var(--yellow)' : count === 0 ? 'var(--text-faint)' : 'var(--cyan)';
       extraInfo += `<div class="ds"><span class="dl">active conns</span><span class="dv" style="color:${color}">${count}</span></div>`;
     }
   } catch(e) {}
@@ -2192,11 +2192,10 @@ async function update_client_details() {
   try {
     const arp = await file_exec('/sbin/ip', ['neigh', 'show', ip]);
     const out = (arp.stdout || '').trim();
-    if (out) {
-      const state = out.split(' ').pop(); 
-      const col = state === 'REACHABLE' ? 'var(--green)' : 'var(--text-muted)';
-      extraInfo += `<div class="ds"><span class="dl">arp state</span><span class="dv" style="color:${col}">${state}</span></div>`;
-    }
+    // Показываем статус всегда, если пусто - пишем 'none'
+    const state = out ? out.split(/\s+/).pop() : 'none'; 
+    const col = state === 'REACHABLE' ? 'var(--green)' : 'var(--text-faint)';
+    extraInfo += `<div class="ds"><span class="dl">arp state</span><span class="dv" style="color:${col}">${state}</span></div>`;
   } catch(e) {}
 
   // 3. Get traffic byte counters
@@ -2217,7 +2216,7 @@ async function update_client_details() {
         const names = (wifs.stdout || '').split('\n').map(s => s.trim()).filter(n => /^wl|^ath|^ra|^mt|^wlan/.test(n));
         for (const wif of names) {
            const r = await file_exec('/usr/bin/iwinfo', [wif, 'assoclist']);
-           const out = r.stdout || '';
+           const out = (r.stdout || '').replace(/["']/g, ''); // На всякий случай чистим кавычки и тут
            const macUpper = mac.toUpperCase();
            if (out.includes(macUpper)) {
               localWifiFound = true;
@@ -2240,29 +2239,28 @@ async function update_client_details() {
         }
      } catch(e) {}
 
-// 4B. Try External AP via SNMP
+     // 4B. Try External AP via SNMP
      if (!localWifiFound && C.wifi_ap) {
          try {
              const snmp = await file_exec('/usr/bin/snmpwalk', [
                  '-Ovq', '-v', '2c', '-c', 'public', C.wifi_ap, 'NET-SNMP-EXTEND-MIB::nsExtendOutputFull."wifidetails"'
              ]);
-             const out = (snmp.stdout || '').trim();
+             // ИСПРАВЛЕНИЕ: Жестко вырезаем все возможные кавычки из ответа SNMP
+             const out = (snmp.stdout || '').replace(/["']/g, '').trim();
              if (out) {
                  const lines = out.split('\n');
                  for (const line of lines) {
                      const parts = line.trim().split(/\s+/);
-                     // Format: MAC IP BAND [NAME(S)...] SIGNAL
                      if (parts.length >= 4 && parts[0].toUpperCase() === mac.toUpperCase()) {
                          const band = parts[2];
                          let apHostname = '';
                          let sigStr = '';
                          
-                         // Smart parsing to handle spaces in hostnames
                          if (parts.length >= 5) {
                              apHostname = parts.slice(3, parts.length - 1).join(' ');
                              sigStr = parts[parts.length - 1];
                          } else {
-                             sigStr = parts[3]; // Fallback if no name provided
+                             sigStr = parts[3];
                          }
                          
                          const sigNum = parseInt(sigStr);
@@ -2308,7 +2306,10 @@ async function update_client_details() {
   h += `<div class="ds"><span class="dl">MAC</span><span class="dv" style="font-family:var(--font-mono);color:var(--text-muted)">${mac.toUpperCase()}</span></div>`;
   h += `<div class="ds"><span class="dl">type</span><span class="dv">${type.toUpperCase()} ${iface ? '('+iface+')' : ''}</span></div>`;
 
-  if (extraInfo) { h += `<hr>`; h += extraInfo; }
+  if (extraInfo) {
+      h += `<hr>`;
+      h += extraInfo;
+  }
 
   if (rxTotal > 0 || txTotal > 0) {
       h += `<hr>`;
@@ -2348,8 +2349,8 @@ async function update_wifi_ap() {
   if (ap) {
     let reachable = false;
     try {
-      let r = await file_exec('/bin/ping', ['-c', '1', '-W', '1', ap]);
-      if ((r?.stdout || '').includes('1 received')) reachable = true;
+      let r = await file_exec('/bin/ping', ['-c', '1', '-W', '2', ap]);
+      if (r && (r.code === 0 || (r.stdout || '').includes('received'))) reachable = true;
     } catch(e) {}
 
     bdg.textContent = reachable ? 'ONLINE' : 'OFFLINE';
@@ -2375,7 +2376,7 @@ async function update_wifi_ap() {
         const snmp = await file_exec('/usr/bin/snmpwalk', [
           '-Ovq', '-v', '2c', '-c', 'public', ap, 'NET-SNMP-EXTEND-MIB::nsExtendOutputFull."wifidetails"'
         ]);
-        const out = (snmp.stdout || '').trim();
+        const out = (snmp.stdout || '').replace(/["']/g, '').trim();
         if (out) {
           html += `<div class="wifi-section"><div class="wifi-sh"><span class="wifi-sname" style="font-size:var(--text-xxs);color:var(--text-faint)">Connected Clients</span></div>`;
           const lines = out.split('\n');
