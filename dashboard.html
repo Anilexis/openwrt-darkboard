@@ -2399,34 +2399,82 @@ async function update_wifi_ap() {
       </div>`;
 
     if (reachable) {
-      // --- Fetch temperature from Access Point via custom SNMP extend ---
+      // --- Fetch Sysinfo (Uptime, Load, RAM) via SNMP ---
+      try {
+        const sysSnmp = await file_exec('/usr/bin/snmpwalk', [
+          '-Ovq', '-v', '2c', '-c', 'public', ap, 'NET-SNMP-EXTEND-MIB::nsExtendOutputFull."sysinfo"'
+        ]);
+        const sysOut = (sysSnmp.stdout || '').replace(/["']/g, '').trim();
+        if (sysOut) {
+          const p = sysOut.split(/\s+/);
+          if (p.length >= 6) {
+            // Parse Uptime
+            const upSec = parseInt(p[0]);
+            const d = Math.floor(upSec / 86400);
+            const h = Math.floor((upSec % 86400) / 3600);
+            const m = Math.floor((upSec % 3600) / 60);
+            let upStr = '';
+            if (d > 0) upStr += `${d}d `;
+            if (h > 0 || d > 0) upStr += `${h}h `;
+            upStr += `${m}m`;
+
+            // Parse Load & Memory
+            const load = `${p[1]} ${p[2]} ${p[3]}`;
+            const memTot = parseInt(p[4]);
+            const memFree = parseInt(p[5]);
+            const memPct = Math.round(((memTot - memFree) / memTot) * 100);
+
+            html += `<div class="wrow"><span class="wlabel">uptime</span><span class="wval">${upStr}</span></div>`;
+            html += `<div class="wrow"><span class="wlabel">sys</span><span class="wval" style="font-size:var(--text-xxs)"><span style="color:var(--text-muted)">load</span> ${load} <span style="color:var(--text-muted);margin-left:8px">mem</span> ${memPct}%</span></div>`;
+          }
+        }
+      } catch(e) {}
+
+      // --- Fetch Temperature via SNMP ---
       try {
         const tSnmp = await file_exec('/usr/bin/snmpwalk', [
           '-Ovq', '-v', '2c', '-c', 'public', ap, 'NET-SNMP-EXTEND-MIB::nsExtendOutputFull."temperatures"'
         ]);
-        // Remove any potential quotes and trim whitespace
         const tOut = (tSnmp.stdout || '').replace(/["']/g, '').trim();
-        
         if (tOut) {
-          // Split the space-separated output (e.g., "60.361 48 49")
           const tParts = tOut.split(/\s+/);
           let tList = [];
-          
-          // Parse CPU temp (Index 0)
-          if (tParts.length > 0 && !isNaN(parseFloat(tParts[0]))) {
-            tList.push(`<span style="color:var(--text-muted)">cpu</span> ${Math.round(parseFloat(tParts[0]))}\u00B0C`);
-          }
-          // Parse wl0 temp (Index 1)
-          if (tParts.length > 1 && !isNaN(parseInt(tParts[1]))) {
-            tList.push(`<span style="color:var(--text-muted)">w0</span> ${parseInt(tParts[1])}\u00B0C`);
-          }
-          // Parse wl1 temp (Index 2)
-          if (tParts.length > 2 && !isNaN(parseInt(tParts[2]))) {
-            tList.push(`<span style="color:var(--text-muted)">w1</span> ${parseInt(tParts[2])}\u00B0C`);
-          }
+          if (tParts.length > 0 && !isNaN(parseFloat(tParts[0]))) tList.push(`<span style="color:var(--text-muted)">cpu</span> ${Math.round(parseFloat(tParts[0]))}\u00B0C`);
+          if (tParts.length > 1 && !isNaN(parseInt(tParts[1]))) tList.push(`<span style="color:var(--text-muted)">w0</span> ${parseInt(tParts[1])}\u00B0C`);
+          if (tParts.length > 2 && !isNaN(parseInt(tParts[2]))) tList.push(`<span style="color:var(--text-muted)">w1</span> ${parseInt(tParts[2])}\u00B0C`);
           
           if (tList.length > 0) {
              html += `<div class="wrow"><span class="wlabel">temp</span><span class="wval" style="display:flex;gap:8px;font-size:var(--text-xxs)">${tList.join(' ')}</span></div>`;
+          }
+        }
+      } catch(e) {}
+
+      // --- Fetch Network Errors via SNMP ---
+      try {
+        const errSnmp = await file_exec('/usr/bin/snmpwalk', [
+          '-Ovq', '-v', '2c', '-c', 'public', ap, 'NET-SNMP-EXTEND-MIB::nsExtendOutputFull."neterrors"'
+        ]);
+        const errOut = (errSnmp.stdout || '').replace(/["']/g, '').trim();
+        if (errOut) {
+          const lines = errOut.split('\n');
+          let errHtml = '';
+          for (const line of lines) {
+            const p = line.trim().split(/\s+/);
+            if (p.length >= 5) {
+              const band = p[0];
+              const errs = parseInt(p[1]) + parseInt(p[2]); // RX + TX errors
+              const drops = parseInt(p[3]) + parseInt(p[4]); // RX + TX drops
+              
+              let str = '';
+              if (errs > 0) str += `<span style="color:var(--red)">err:${errs}</span> `;
+              if (drops > 0) str += `<span style="color:var(--yellow)">drp:${drops}</span>`;
+              if (!str) str = `<span style="color:var(--text-faint)">ok</span>`;
+
+              errHtml += `<div style="display:flex;gap:4px;"><span style="color:var(--text-muted)">${band}</span> ${str}</div>`;
+            }
+          }
+          if (errHtml) {
+            html += `<div class="wrow"><span class="wlabel">errors</span><span class="wval" style="display:flex;gap:12px;font-size:var(--text-xxs)">${errHtml}</span></div>`;
           }
         }
       } catch(e) {}
@@ -2438,7 +2486,6 @@ async function update_wifi_ap() {
         const snmp = await file_exec('/usr/bin/snmpwalk', [
           '-Ovq', '-v', '2c', '-c', 'public', ap, 'NET-SNMP-EXTEND-MIB::nsExtendOutputFull."wifidetails"'
         ]);
-        // Force remove any quotes from SNMP response
         const out = (snmp.stdout || '').replace(/["']/g, '').trim();
         if (out) {
           html += `<div class="wifi-section"><div class="wifi-sh"><span class="wifi-sname" style="font-size:var(--text-xxs);color:var(--text-faint)">Connected Clients</span></div>`;
