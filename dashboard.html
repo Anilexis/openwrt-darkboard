@@ -2396,14 +2396,42 @@ async function update_wifi_ap() {
       <div class="wrow"><span class="wlabel">IP</span><span class="wval">${ap}</span></div>
       <div class="wrow"><span class="wlabel">admin</span>
         <a class="wlink" href="${proto}://${ap}${port !== 80 ? ':' + port : ''}/" target="_blank" rel="noopener">:${port} \u2197</a>
-      </div>
-    </div>`;
+      </div>`;
 
     if (reachable) {
+      // --- Fetch temperature from Access Point ---
+      try {
+         const tUrl = `${proto}://${ap}${port !== 80 ? ':' + port : ''}/ajax_coretmp.asp`;
+         const rTemp = await file_exec('/usr/bin/curl', ['-s', '-m', '2', '-k', tUrl]);
+         const tOut = rTemp.stdout || '';
+         
+         let tList = [];
+         // Parse CPU temperature
+         const cpuM = tOut.match(/curr_cpuTemp\s*=\s*"([\d\.]+)"/);
+         if (cpuM) {
+             const t = Math.round(parseFloat(cpuM[1]));
+             tList.push(`<span style="color:var(--text-muted)">cpu</span> ${t}\u00B0C`);
+         }
+         // Parse radio temperatures (wl0, wl1, etc.)
+         const wlRegex = /curr_coreTmp_wl(\d+)_raw\s*=\s*"(\d+)°C"/g;
+         let wlM;
+         while ((wlM = wlRegex.exec(tOut)) !== null) {
+             tList.push(`<span style="color:var(--text-muted)">w${wlM[1]}</span> ${wlM[2]}\u00B0C`);
+         }
+         
+         if (tList.length > 0) {
+             html += `<div class="wrow"><span class="wlabel">temp</span><span class="wval" style="display:flex;gap:8px;font-size:var(--text-xxs)">${tList.join(' ')}</span></div>`;
+         }
+      } catch(e) {}
+      
+      html += `</div>`; // Close base info section
+
+      // --- Fetch connected clients via SNMP ---
       try {
         const snmp = await file_exec('/usr/bin/snmpwalk', [
           '-Ovq', '-v', '2c', '-c', 'public', ap, 'NET-SNMP-EXTEND-MIB::nsExtendOutputFull."wifidetails"'
         ]);
+        // Force remove any quotes from SNMP response
         const out = (snmp.stdout || '').replace(/["']/g, '').trim();
         if (out) {
           html += `<div class="wifi-section"><div class="wifi-sh"><span class="wifi-sname" style="font-size:var(--text-xxs);color:var(--text-faint)">Connected Clients</span></div>`;
@@ -2418,7 +2446,6 @@ async function update_wifi_ap() {
               let apHostname = '';
               let sigStr = '';
               
-              // Smart parsing for optional hostname
               if (p.length >= 5) {
                   apHostname = p.slice(3, p.length - 1).join(' ');
                   sigStr = p[p.length - 1];
@@ -2427,16 +2454,12 @@ async function update_wifi_ap() {
               }
               
               const sig = parseInt(sigStr);
-
               let lvl = 0;
               if (sig >= -60) lvl = 3;
               else if (sig >= -75) lvl = 2;
               else if (sig >= -90) lvl = 1;
 
-              // Display Name Priority: 
-              // 1. CLIENT_MAP (static config)
-              // 2. AP Hostname (from SNMP)
-              // 3. Fallback to just IP
+              // Format display name with gray IP dot
               const ipSuffix = ip.split('.').pop();
               let namePart = ip;
               let ipPart = '';
@@ -2463,6 +2486,8 @@ async function update_wifi_ap() {
           html += `</div>`;
         }
       } catch(e) {}
+    } else {
+        html += `</div>`; // Close section if AP is unreachable
     }
 
     html += await _wifi_local_radios(false);
@@ -2470,6 +2495,7 @@ async function update_wifi_ap() {
     return;
   }
 
+  // Fallback for local radio modules
   const radios = await _wifi_local_radios(true);
   if (radios) {
     bdg.textContent = 'LOCAL';
