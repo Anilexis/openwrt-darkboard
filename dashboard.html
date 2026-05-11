@@ -2399,29 +2399,36 @@ async function update_wifi_ap() {
       </div>`;
 
     if (reachable) {
-      // --- Fetch temperature from Access Point ---
+      // --- Fetch temperature from Access Point via custom SNMP extend ---
       try {
-         const tUrl = `${proto}://${ap}${port !== 80 ? ':' + port : ''}/ajax_coretmp.asp`;
-         const rTemp = await file_exec('/usr/bin/curl', ['-s', '-m', '2', '-k', tUrl]);
-         const tOut = rTemp.stdout || '';
-         
-         let tList = [];
-         // Parse CPU temperature
-         const cpuM = tOut.match(/curr_cpuTemp\s*=\s*"([\d\.]+)"/);
-         if (cpuM) {
-             const t = Math.round(parseFloat(cpuM[1]));
-             tList.push(`<span style="color:var(--text-muted)">cpu</span> ${t}\u00B0C`);
-         }
-         // Parse radio temperatures (wl0, wl1, etc.)
-         const wlRegex = /curr_coreTmp_wl(\d+)_raw\s*=\s*"(\d+)°C"/g;
-         let wlM;
-         while ((wlM = wlRegex.exec(tOut)) !== null) {
-             tList.push(`<span style="color:var(--text-muted)">w${wlM[1]}</span> ${wlM[2]}\u00B0C`);
-         }
-         
-         if (tList.length > 0) {
+        const tSnmp = await file_exec('/usr/bin/snmpwalk', [
+          '-Ovq', '-v', '2c', '-c', 'public', ap, 'NET-SNMP-EXTEND-MIB::nsExtendOutputFull."temperatures"'
+        ]);
+        // Remove any potential quotes and trim whitespace
+        const tOut = (tSnmp.stdout || '').replace(/["']/g, '').trim();
+        
+        if (tOut) {
+          // Split the space-separated output (e.g., "60.361 48 49")
+          const tParts = tOut.split(/\s+/);
+          let tList = [];
+          
+          // Parse CPU temp (Index 0)
+          if (tParts.length > 0 && !isNaN(parseFloat(tParts[0]))) {
+            tList.push(`<span style="color:var(--text-muted)">cpu</span> ${Math.round(parseFloat(tParts[0]))}\u00B0C`);
+          }
+          // Parse wl0 temp (Index 1)
+          if (tParts.length > 1 && !isNaN(parseInt(tParts[1]))) {
+            tList.push(`<span style="color:var(--text-muted)">w0</span> ${parseInt(tParts[1])}\u00B0C`);
+          }
+          // Parse wl1 temp (Index 2)
+          if (tParts.length > 2 && !isNaN(parseInt(tParts[2]))) {
+            tList.push(`<span style="color:var(--text-muted)">w1</span> ${parseInt(tParts[2])}\u00B0C`);
+          }
+          
+          if (tList.length > 0) {
              html += `<div class="wrow"><span class="wlabel">temp</span><span class="wval" style="display:flex;gap:8px;font-size:var(--text-xxs)">${tList.join(' ')}</span></div>`;
-         }
+          }
+        }
       } catch(e) {}
       
       html += `</div>`; // Close base info section
