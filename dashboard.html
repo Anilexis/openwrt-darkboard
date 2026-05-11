@@ -343,8 +343,8 @@ hr{border:none;border-top:1px solid var(--border);margin:2px 0;}
     grid-template-areas:
       "cpu     memory   storage"
       "ifaces  latency  wan"
-      "clients mihomo   adguard"
-      "services services wifi";
+      "clients mihomo   services"
+      "wifi    adguard  services";
     gap:1px;
   }
   .panel{min-height:170px;}
@@ -363,7 +363,7 @@ hr{border:none;border-top:1px solid var(--border);margin:2px 0;}
       "ifaces   clients"
       "latency  mihomo"
       "services adguard"
-      "wifi     wifi";
+      "services wifi";
   }
   .panel{min-height:150px;}
 }
@@ -395,7 +395,7 @@ hr{border:none;border-top:1px solid var(--border);margin:2px 0;}
     <div class="tb-r">
       <span style="cursor:pointer;color:var(--text-faint)" onclick="show_setup()" title="Settings / Credentials">&#9881;</span>
       <span class="tb-sep">|</span>
-      <span>uptime <span id="tb-up" class="tb-uptime">--:--:--</span></span>
+      <span style="white-space:nowrap">uptime <span id="tb-up" class="tb-uptime">--:--:--</span></span>
       <span class="tb-sep">|</span>
       <span id="tb-temp" style="color:var(--green)">--</span>
       <span class="tb-sep">|</span>
