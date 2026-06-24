@@ -499,9 +499,15 @@ hr{border:none;border-top:1px solid var(--border);margin:2px 0;}
     </div>
 
     <!-- R3 C1 - CLIENTS -->
-    <div class="panel cell-clients">
+<div class="panel cell-clients">
       <div class="ptitle">
         <span>CLIENTS <span class="badge b-ok" id="cl-bdg" style="background:var(--surface-3);color:var(--text-muted)">--</span></span>
+        <div class="ptitle-r">
+          <label style="display:flex;align-items:center;gap:4px;font-size:var(--text-xxs);color:var(--text-faint);font-weight:400;letter-spacing:0;text-transform:none;cursor:pointer;" title="Show Docker containers">
+          <input type="checkbox" id="docker-filter-cb" onchange="toggleDockerFilter()" style="accent-color:var(--cyan);margin:0;width:11px;height:11px;cursor:pointer;flex-shrink:0;">
+            docker
+          </label>
+        </div>
       </div>
       <div class="si" id="clients-p">
         <div class="met"><span class="ml" style="color:var(--text-faint)">reading leases...</span></div>
@@ -1035,9 +1041,11 @@ const tick_clock = () => {
 setInterval(tick_clock, 1000); tick_clock();
 
 // ===== LUCI UBUS =====
-// Login uses a shared promise so concurrent callers wait for one login attempt
 let _loginPromise = null;
+let _authFailed = false; 
+
 async function luci_login() {
+  if (_authFailed) return null; 
   if (_loginPromise) return _loginPromise;
   _loginPromise = (async () => {
     try {
@@ -1048,7 +1056,13 @@ async function luci_login() {
         signal: AbortSignal.timeout(4000)
       });
       const j = await res.json();
-      if (j.result?.[1]?.ubus_rpc_session) tok = j.result[1].ubus_rpc_session;
+      if (j.result?.[1]?.ubus_rpc_session) {
+        tok = j.result[1].ubus_rpc_session;
+        _authFailed = false;
+      } else if (j.result?.[0] === 5 || !j.result) {
+        _authFailed = true; // Password invalid
+        console.warn('LuCI login: Access Denied. Check credentials.');
+      }
     } catch(e) {} finally {
       _loginPromise = null;
     }
@@ -1067,11 +1081,12 @@ async function _ubus_rpc(tok_str, obj, method, args) {
 }
 
 async function luci_call(obj, method, args) {
+  if (_authFailed && method !== 'login') return null;
   try {
     const j = await _ubus_rpc(tok || '0'.repeat(32), obj, method, args);
     if (j.result?.[0] === 6) {
-      // Session expired — all waiters share one login attempt
       await luci_login();
+      if (_authFailed) return null;
       const j2 = await _ubus_rpc(tok || '0'.repeat(32), obj, method, args);
       return j2.result;
     }
@@ -1079,10 +1094,8 @@ async function luci_call(obj, method, args) {
   } catch(e) { return null; }
 }
 
-// Batch multiple ubus calls into one HTTP request (JSONRPC batch)
 async function luci_batch(calls) {
-  // calls = [{ obj, method, args }, ...]
-  // returns array of results in same order
+  if (_authFailed) return calls.map(() => null);
   try {
     const body = calls.map((c, i) => ({
       jsonrpc: '2.0', id: i + 1, method: 'call',
@@ -1094,9 +1107,9 @@ async function luci_batch(calls) {
       signal: AbortSignal.timeout(8000)
     });
     const jarr = await res.json();
-    // If session expired (any result has code 6), re-login and retry all
     if (Array.isArray(jarr) && jarr.some(j => j.result?.[0] === 6)) {
       await luci_login();
+      if (_authFailed) return calls.map(() => null);
       const body2 = calls.map((c, i) => ({
         jsonrpc: '2.0', id: i + 1, method: 'call',
         params: [tok || '0'.repeat(32), c.obj, c.method, c.args || {}]
@@ -1108,7 +1121,6 @@ async function luci_batch(calls) {
       });
       const jarr2 = await res2.json();
       if (!Array.isArray(jarr2)) return calls.map(() => null);
-      // Sort by id to preserve order
       const sorted = new Array(calls.length).fill(null);
       for (const j of jarr2) if (j.id >= 1 && j.id <= calls.length) sorted[j.id - 1] = j.result;
       return sorted;
@@ -1345,6 +1357,19 @@ function toggleStorageFilter() {
 document.addEventListener('DOMContentLoaded', () => {
   const cb = document.getElementById('storage-filter-cb');
   if (cb) cb.checked = storageFilterMain;
+});
+
+// ===== CLIENTS FILTER =====
+let showDockerClients = localStorage.getItem('darkboard_show_docker') === '1';
+function toggleDockerFilter() {
+  const cb = document.getElementById('docker-filter-cb');
+  showDockerClients = cb.checked;
+  localStorage.setItem('darkboard_show_docker', showDockerClients ? '1' : '0');
+  update_clients();
+}
+document.addEventListener('DOMContentLoaded', () => {
+  const cb = document.getElementById('docker-filter-cb');
+  if (cb) cb.checked = showDockerClients;
 });
 
 // ===== DISKS =====
@@ -2237,6 +2262,11 @@ async function update_clients() {
   
   leases = Array.from(uniqueV4.values());
 
+  // DOCKER FITLER
+  if (!showDockerClients) {
+     leases = leases.filter(l => !l.ip.startsWith('172.17.'));
+  }
+
   if (!leases.length) {
     $('clients-p').innerHTML = '<div class="met"><span class="ml" style="color:var(--text-faint)">no leases</span></div>';
     $('cl-bdg').textContent = '0'; $('cl-bdg').className = 'badge'; $('cl-bdg').style.cssText = 'background:var(--surface-3);color:var(--text-muted)';
@@ -2270,6 +2300,13 @@ async function update_clients() {
     </div>`;
   }
 
+  if (selectedClientData) {
+    const stillExists = leases.find(l => l.ip === selectedClientData.ip);
+    if (!stillExists) {
+      close_client_details();
+    }
+  }  
+
   if (!selectedClientData) {
     $('clients-p').innerHTML = html;
   }
@@ -2282,15 +2319,19 @@ async function update_clients() {
 
 function show_client_details(ip, mac, name, type, iface) {
   selectedClientData = { ip, mac, name, type, iface };
+  clientStatsPrev = null;
+  clientStatsTs = 0;
   $('clients-p').innerHTML = '<div class="met"><span class="ml muted">loading data...</span></div>';  
   if (clientDetailTimer) clearTimeout(clientDetailTimer);
-  update_client_details(); // Trigger first render immediately
+  update_client_details(); 
 }
 
 function close_client_details() {
   selectedClientData = null;
+  clientStatsPrev = null;
+  clientStatsTs = 0;
   if (clientDetailTimer) clearTimeout(clientDetailTimer);
-  update_clients(); // Return to list immediately
+  update_clients(); 
 }
 
 async function update_client_details() {
@@ -2304,7 +2345,7 @@ async function update_client_details() {
   try {
     const ct = await file_exec('/bin/grep', ['-c', ip, '/proc/net/nf_conntrack']);
     const count = parseInt((ct.stdout || '').trim());
-    if (!isNaN(count)) { // Выводим всегда, даже если 0
+    if (!isNaN(count)) { 
       const color = count > 300 ? 'var(--red)' : count > 100 ? 'var(--yellow)' : count === 0 ? 'var(--text-faint)' : 'var(--cyan)';
       extraInfo += `<div class="ds"><span class="dl">active conns</span><span class="dv" style="color:${color}">${count}</span></div>`;
     }
@@ -2314,7 +2355,6 @@ async function update_client_details() {
   try {
     const arp = await file_exec('/sbin/ip', ['neigh', 'show', ip]);
     const out = (arp.stdout || '').trim();
-    // Показываем статус всегда, если пусто - пишем 'none'
     const state = out ? out.split(/\s+/).pop() : 'none'; 
     const col = state === 'REACHABLE' ? 'var(--green)' : 'var(--text-faint)';
     extraInfo += `<div class="ds"><span class="dl">arp state</span><span class="dv" style="color:${col}">${state}</span></div>`;
@@ -2367,7 +2407,6 @@ async function update_client_details() {
              const snmp = await file_exec('/usr/bin/snmpwalk', [
                  '-Ovq', '-v', '2c', '-c', 'public', C.wifi_ap, 'NET-SNMP-EXTEND-MIB::nsExtendOutputFull."wifidetails"'
              ]);
-             // ИСПРАВЛЕНИЕ: Жестко вырезаем все возможные кавычки из ответа SNMP
              const out = (snmp.stdout || '').replace(/["']/g, '').trim();
              if (out) {
                  const lines = out.split('\n');
@@ -2403,6 +2442,8 @@ async function update_client_details() {
      }
   }
 
+  if (selectedClientData?.ip !== ip) return; 
+
   // Calculate speeds
   if (rxTotal > 0 || txTotal > 0) {
       if (clientStatsPrev && clientStatsPrev.ip === ip && clientStatsTs > 0) {
@@ -2415,8 +2456,6 @@ async function update_client_details() {
       clientStatsPrev = { ip, rx: rxTotal, tx: txTotal };
       clientStatsTs = now;
   }
-
-  if (selectedClientData?.ip !== ip) return; 
 
   // Build card HTML
   let h = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;padding-bottom:2px;border-bottom:1px solid var(--border-2)">
@@ -2461,7 +2500,6 @@ async function update_client_details() {
 async function init_wifi_admin_link() {
   const ap = C.wifi_ap;
   const link = document.getElementById('wifi-admin-link');
-  const tbLink = document.getElementById('tb-links-ct');
   if (ap && C.wifi_ap_port) {
     const proto = C.wifi_ap_https ? 'https' : 'http';
     const port = C.wifi_ap_port || 80;
@@ -2642,16 +2680,18 @@ async function update_wifi_ap() {
           html += `</div>`;
         }
       } catch(e) {}
-    } else {
-        html += `</div>`; // Close section if AP is unreachable
+    } 
+    html += `</div>`;
+    
+    const localRadiosHtml = await _wifi_local_radios(false);
+    if (localRadiosHtml) {
+      html += `<hr style="margin:4px 0; border-color:var(--surface-3);">`;
+      html += localRadiosHtml;
     }
-
-    html += await _wifi_local_radios(false);
     $('wifi-p').innerHTML = html;
     return;
   }
 
-  // Fallback for local radio modules
   const radios = await _wifi_local_radios(true);
   if (radios) {
     bdg.textContent = 'LOCAL';
