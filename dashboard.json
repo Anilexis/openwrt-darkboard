@@ -54,78 +54,41 @@
         ]
       },
       "file": {
-        "/proc/cpuinfo": [
-          "read"
-        ],
-        "/proc/stat": [
-          "read"
-        ],
-        "/proc/loadavg": [
-          "read"
-        ],
-        "/proc/meminfo": [
-          "read"
-        ],
-        "/proc/net/arp": [
-          "read"
-        ],
-        "/proc/net/dev": [
-          "read"
-        ],
-        "/proc/sys/net/netfilter/nf_conntrack_count": [
-          "read"
-        ],
-        "/proc/sys/net/netfilter/nf_conntrack_max": [
-          "read"
-        ],
-        "/tmp/dhcp.leases": [
-          "read"
-        ],
-        "/sys/class/thermal/thermal_zone*/temp": [
-          "read"
-        ],
-        "/sys/class/net/*/speed": [
-          "read"
-        ],
-        "/usr/bin/curl": [
-          "exec"
-        ],
-        "/usr/bin/ethtool": [
-          "exec"
-        ],
-        "/usr/sbin/ethtool": [
-          "exec"
-        ],
-        "/usr/bin/ping": [
-          "exec"
-        ],
-        "/bin/ping": [
-          "exec"
-        ],
-        "/usr/bin/iwinfo": [
-          "exec"
-        ],
-        "/usr/bin/sensors": [
-          "exec"
-        ],
-        "/usr/sbin/sensors": [
-          "exec"
-        ],
-        "/usr/sbin/nft": [
-          "exec"
-        ],
-        "/usr/sbin/nft --terse --json list ruleset": [
-          "exec"
-        ],
-        "/usr/bin/nvme": [
-          "exec"
-        ],
-        "/sbin/logread": [
-          "exec"
-        ],
-        "/etc/init.d/*": [
-          "exec"
-        ]
+        "/proc/cpuinfo": ["read"],
+        "/proc/stat": ["read"],
+        "/proc/loadavg": ["read"],
+        "/proc/meminfo": ["read"],
+        "/proc/net/arp": ["read"],
+        "/proc/net/dev": ["read"],
+        "/proc/sys/net/netfilter/nf_conntrack_count": ["read"],
+        "/proc/sys/net/netfilter/nf_conntrack_max": ["read"],
+        "/tmp/dhcp.leases": ["read"],
+        "/sys/class/thermal/thermal_zone*/temp": ["read"],
+        "/sys/class/net/*/speed": ["read"],
+        
+        "/usr/bin/snmpwalk": ["exec"],
+        "/bin/grep": ["exec"],
+        "/sbin/ip": ["exec"],
+        "/bin/ls": ["exec"],
+        "/bin/cat": ["exec"],
+        "/proc/net/nf_conntrack": ["read"],
+        "/etc/config/dhcp": ["read"],
+        "/etc/hosts": ["read"],
+        "/tmp/hosts/*": ["read"],
+
+        "/usr/bin/curl": ["exec"],
+        "/usr/bin/ethtool": ["exec"],
+        "/usr/sbin/ethtool": ["exec"],
+        "/usr/bin/ping": ["exec"],
+        "/bin/ping": ["exec"],
+        "/usr/bin/iwinfo": ["exec"],
+        "/usr/bin/sensors": ["exec"],
+        "/usr/sbin/sensors": ["exec"],
+        "/usr/sbin/nft": ["exec"],
+        "/usr/sbin/nft --terse --json list ruleset": ["exec"],
+        "/usr/bin/nvme": ["exec"],
+        "/sbin/logread": ["exec"],
+        "/etc/init.d/*": ["exec"]
       }
     },
     "write": {
