@@ -820,7 +820,6 @@ async function rebuild_topbar_links() {
   if (aghLink) aghLink.href = agh_url;
 
   // Base array to store dynamically discovered active services
-  // We specify the expected favicon path (fav) for each service
   const apps = [
     { name: 'LuCI', url: luci_url, icon: '⚙️', bg: 'var(--blue-dim)', showInTopbar: true, fav: luci_url + '/favicon.ico' }
   ];
@@ -835,18 +834,6 @@ async function rebuild_topbar_links() {
       const r = await fetch(C.mihomo_api + '/configs', { headers: H, signal: AbortSignal.timeout(2000) });
       if (r.ok) {
         apps.push({ name: 'Mihomo', url: meta_url, icon: '😺', bg: 'var(--cyan-dim)', showInTopbar: true, fav: meta_url + '/favicon.ico' });
-      }
-    } catch(e) {}
-  })());
-
-  // Dynamic check for AdGuard Home
-  checks.push((async () => {
-    try {
-      const r = await file_exec('/usr/bin/curl', ['-s', '-m', '2', '-o', '/dev/null', '-w', '%{http_code}', `http://127.0.0.1:${agh_port}/control/status`]);
-      const code = parseInt((r.stdout || '').trim());
-      if (code > 0 && code < 600) {
-        // AdGuard often uses apple-touch-icon.png or favicon.ico
-        apps.push({ name: 'AdGuard', url: agh_url, icon: '🛡️', bg: 'var(--green-dim)', showInTopbar: true, fav: agh_url + '/favicon.ico' });
       }
     } catch(e) {}
   })());
@@ -866,31 +853,42 @@ async function rebuild_topbar_links() {
     }
   }).catch(()=>{}));
 
-  // Universal helper function to verify service presence and assign favicon
-  const checkPort = async (port, name, urlSuffix, icon, bg, favPath = '/favicon.ico') => {
+  // Universal helper function to verify service presence
+  const checkService = async (port, name, urlSuffix, icon, bg, showInTopbar = false, favPath = '/favicon.ico') => {
+    let isAlive = false;
+    const targetUrl = `http://${host}:${port}${urlSuffix}`;
+    const checkUrl = `http://${host}:${port}/`;
+
+    // 1. Try local curl on the target host IP (not 127.0.0.1)
     try {
-      const r = await file_exec('/usr/bin/curl', ['-s', '-m', '2', '-o', '/dev/null', '-w', '%{http_code}', `http://127.0.0.1:${port}/`]);
+      const r = await file_exec('/usr/bin/curl', ['-s', '-m', '2', '-o', '/dev/null', '-w', '%{http_code}', checkUrl]);
       const code = parseInt((r.stdout || '').trim());
-      if (code > 0 && code < 600) {
-        apps.push({ 
-          name, 
-          url: `http://${host}:${port}${urlSuffix}`, 
-          icon, 
-          bg, 
-          showInTopbar: false, 
-          fav: `http://${host}:${port}${favPath}` 
-        });
-      }
+      if (code > 0 && code < 600) isAlive = true;
     } catch(e) {}
+
+    // 2. Fallback to direct browser fetch (bypasses missing curl issues)
+    if (!isAlive) {
+      try {
+        await fetch(checkUrl, { mode: 'no-cors', signal: AbortSignal.timeout(2000) });
+        isAlive = true; // if fetch resolves (doesn't throw connection refused), the port is open
+      } catch(e) {}
+    }
+
+    if (isAlive) {
+      apps.push({ name, url: targetUrl, icon, bg, showInTopbar, fav: `http://${host}:${port}${favPath}` });
+    }
   };
 
+  // Add AdGuard to universal check
+  checks.push(checkService(agh_port, 'AdGuard', '', '🛡️', 'var(--green-dim)', true));
+
   // Run parallel port checks for extra services
-  checks.push(checkPort(8096, 'Jellyfin', '', '🎬', 'var(--purple-dim)'));
-  checks.push(checkPort(C.cake_stats_port || 11112, 'cake-stats', '', '🍰', 'var(--yellow-dim)'));
-  checks.push(checkPort(8090, 'TorrServer', '', '🧲', 'var(--orange-dim)'));
-  checks.push(checkPort(9091, 'Transmission', '', '🔄', 'var(--red-dim)'));
-  checks.push(checkPort(19999, 'Netdata', '', '📈', 'var(--green-dim)'));
-  checks.push(checkPort(8282, 'MeshMonitor', '', '🌐', 'var(--cyan-dim)'));
+  checks.push(checkService(8096, 'Jellyfin', '', '🎬', 'var(--purple-dim)'));
+  checks.push(checkService(C.cake_stats_port || 11112, 'cake-stats', '', '🍰', 'var(--yellow-dim)'));
+  checks.push(checkService(8090, 'TorrServer', '', '🧲', 'var(--orange-dim)'));
+  checks.push(checkService(9091, 'Transmission', '', '🔄', 'var(--red-dim)'));
+  checks.push(checkService(19999, 'Netdata', '', '📈', 'var(--green-dim)'));
+  checks.push(checkService(8282, 'MeshMonitor', '', '🌐', 'var(--cyan-dim)'));
 
   // Wait until all asynchronous status checks settle
   await Promise.allSettled(checks);
@@ -919,7 +917,6 @@ async function rebuild_topbar_links() {
   apps.sort((a, b) => a.name.localeCompare(b.name));
   
   apps.forEach(app => {
-    // The onerror attribute hides the broken image and shows the span with the emoji instead
     modalHtml += `<a class="srv-btn" href="${app.url}" target="_blank" rel="noopener">
       <div class="srv-icon" style="background:${app.bg}">
         <img src="${app.fav}" alt="${app.name} icon" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
