@@ -149,6 +149,15 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .bf.warn{background:var(--yellow);}.bf.err{background:var(--red);}
 .bf.blue{background:var(--blue);}.bf.cyan{background:var(--cyan);}.bf.purple{background:var(--purple);}
 
+/* ============================================================ OTHER SERVICES MODAL */
+.services-grid {display: grid;grid-template-columns:repeat(auto-fill, minmax(100px, 1fr));gap: 12px;  margin-top: 10px;}
+.srv-btn {display: flex;flex-direction: column;align-items: center;justify-content: center;background: var(--surface-3);border: 1px solid var(--border);border-radius: 8px;padding: 16px 8px;text-decoration: none;color: var(--text); transition: all 0.2s; cursor: pointer;}
+.srv-btn:hover {border-color: var(--cyan);background: var(--surface-2);transform: translateY(-2px);box-shadow: 0 4px 12px rgba(0,0,0,0.5);}
+.srv-icon {width: 44px;height: 44px;border-radius: 12px;display: flex;align-items: center;justify-content: center;font-size: 24px;margin-bottom: 10px;border: 1px solid var(--border-2);box-shadow: inset 0 2px 4px rgba(255,255,255,0.05);}
+.srv-name {font-size: var(--text-xs);font-weight: 500;text-align: center;}
+.srv-icon img {width: 28px;height: 28px;object-fit: contain;}
+.fallback-icon {font-size: 24px;line-height: 1;}
+
 /* ============================================================ SETUP MODAL */
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;display:flex;align-items:center;justify-content:center;}
 .modal-overlay.hidden{display:none;}
@@ -642,6 +651,21 @@ hr{border:none;border-top:1px solid var(--border);margin:2px 0;}
   </div>
 </div>
 
+<!-- BUTTONS MODAL -->
+<div class="modal-overlay hidden" id="other-services-modal">
+  <div class="modal-box" style="max-width: 500px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px;">
+      <div class="modal-title" style="margin:0;">&#9881; Installed Services</div>
+      <button class="svc-action" style="color:var(--red); font-size: 16px; padding: 4px;" onclick="close_other_services()" title="Close">&#10005;</button>
+    </div>
+    <div class="modal-sub">Click a tile to open the service control panel.</div>
+    
+    <div class="services-grid" id="other-services-grid">
+      <div class="met"><span class="ml" style="color:var(--text-faint)">checking services...</span></div>
+    </div>
+  </div>
+</div>
+
 <div class="footer"><a href="https://github.com/Anilexis/openwrt-darkboard" target="_blank" rel="noopener noreferrer">DarkBoard</a></div>
 
 <script>
@@ -761,67 +785,145 @@ function apply_router_url(routerUrl) {
 })();
 
 // ===== TOPBAR LINKS (dynamic, rebuilt whenever config changes) =====
+
+function show_other_services() { document.getElementById('other-services-modal').classList.remove('hidden'); }
+function close_other_services() { document.getElementById('other-services-modal').classList.add('hidden'); }
+
+// Close modal when clicking outside of it
+document.addEventListener('DOMContentLoaded', () => {
+  const overlayOther = document.getElementById('other-services-modal');
+  if (overlayOther) overlayOther.addEventListener('click', e => {
+    if (e.target === overlayOther) close_other_services();
+  });
+});
+
 async function rebuild_topbar_links() {
   const host = C.adguard_host || DEFAULTS.router_ip;
   const luci_port = C.luci_port || DEFAULTS.luci_port;
   const mihomo_port = C.mihomo_port || DEFAULTS.mihomo_port;
   const agh_port = C.adguard_port || DEFAULTS.adguard_port;
-  const ariangport= C.ariangport  || DEFAULTS.ariangport;
 
   const luci_url = 'http://' + host + (luci_port !== 80 ? ':' + luci_port : '');
   const meta_url = 'http://' + host + ':' + mihomo_port + '/ui';
   const agh_url  = 'http://' + host + ':' + agh_port;
-  const ariangurl= 'http://' + host + '/ariang'; 
-  const jellyfin_url = 'http://' + host + ':8096';
 
-  let html = '';
-  html += '<a class="tb-link" href="' + luci_url + '" target="_blank" rel="noopener">LuCI</a>';
-  html += '<a class="tb-link" href="' + meta_url + '" target="_blank" rel="noopener">Metacubexd</a>';
-  html += '<a class="tb-link" href="' + agh_url + '" target="_blank" rel="noopener">AdGuard</a>';
-
-  // WiFi AP link
-  if (C.wifi_ap) {
-    const proto = C.wifi_ap_https ? 'https' : 'http';
-    const port = C.wifi_ap_port || 80;
-    const ap_url = proto + '://' + C.wifi_ap + (port !== 80 ? ':' + port : '');
-    html += '<a class="tb-link" href="' + ap_url + '" target="_blank" rel="noopener">WiFi AP</a>';
-  }
-
-  try {
-    const r = await luci_call('service', 'list', { name: 'aria2' });
-    const inst = r?.[1]?.aria2?.instances;
-    const running = inst && Object.values(inst).some(i => i.running);
-    if (running) {
-      html += `<a class="tb-link" href="${ariangurl}" target="_blank" rel="noopener">AriaNG</a>`;
-    }
-  } catch(e) {}
-
-  try {
-    const r_jf = await file_exec('/usr/bin/curl', ['-s', '-m', '2', '-o', '/dev/null', '-w', '%{http_code}', 'http://127.0.0.1:8096/']);
-    const code = parseInt((r_jf.stdout || '').trim());
-    if (code > 0 && code < 600) {
-      html += `<a class="tb-link" href="${jellyfin_url}" target="_blank" rel="noopener">Jellyfin</a>`;
-    }
-  } catch(e) {}
-
-  try {
-    const cake_port = C.cake_stats_port || DEFAULTS.cake_stats_port;
-    const cake_url  = 'http://' + host + ':' + cake_port;
-    const r_cs = await file_exec('/usr/bin/curl', ['-s', '-m', '2', '-o', '/dev/null', '-w', '%{http_code}', 'http://127.0.0.1:' + cake_port + '/']);
-    const code_cs = parseInt((r_cs.stdout || '').trim());
-    if (code_cs > 0 && code_cs < 600) {
-      html += `<a class="tb-link" href="${cake_url}" target="_blank" rel="noopener">cake-stats</a>`;
-    }
-  } catch(e) {}
-
-  const ct = document.getElementById('tb-links-ct');
-  if (ct) ct.innerHTML = html;
-
-  // Update panel external links
+  // Update links in internal widgets immediately
   const miLink = document.getElementById('mihomo-ext-link');
   if (miLink) miLink.href = meta_url;
   const aghLink = document.getElementById('adguard-ext-link');
   if (aghLink) aghLink.href = agh_url;
+
+  // Base array to store dynamically discovered active services
+  // We specify the expected favicon path (fav) for each service
+  const apps = [
+    { name: 'LuCI', url: luci_url, icon: '⚙️', bg: 'var(--blue-dim)', showInTopbar: true, fav: luci_url + '/favicon.ico' }
+  ];
+
+  const checks = [];
+
+  // Dynamic check for Mihomo Core
+  checks.push((async () => {
+    try {
+      const H = { 'Content-Type': 'application/json' };
+      if (C.mihomo_secret) H['Authorization'] = 'Bearer ' + C.mihomo_secret;
+      const r = await fetch(C.mihomo_api + '/configs', { headers: H, signal: AbortSignal.timeout(2000) });
+      if (r.ok) {
+        apps.push({ name: 'Mihomo', url: meta_url, icon: '😺', bg: 'var(--cyan-dim)', showInTopbar: true, fav: meta_url + '/favicon.ico' });
+      }
+    } catch(e) {}
+  })());
+
+  // Dynamic check for AdGuard Home
+  checks.push((async () => {
+    try {
+      const r = await file_exec('/usr/bin/curl', ['-s', '-m', '2', '-o', '/dev/null', '-w', '%{http_code}', `http://127.0.0.1:${agh_port}/control/status`]);
+      const code = parseInt((r.stdout || '').trim());
+      if (code > 0 && code < 600) {
+        // AdGuard often uses apple-touch-icon.png or favicon.ico
+        apps.push({ name: 'AdGuard', url: agh_url, icon: '🛡️', bg: 'var(--green-dim)', showInTopbar: true, fav: agh_url + '/favicon.ico' });
+      }
+    } catch(e) {}
+  })());
+
+  // Check external WiFi AP configuration
+  if (C.wifi_ap) {
+    const proto = C.wifi_ap_https ? 'https' : 'http';
+    const port = C.wifi_ap_port || 80;
+    const apUrl = `${proto}://${C.wifi_ap}${port !== 80 ? ':' + port : ''}`;
+    apps.push({ name: 'WiFi AP', url: apUrl, icon: '📶', bg: 'var(--purple-dim)', showInTopbar: true, fav: apUrl + '/favicon.ico' });
+  }
+
+  // Check AriaNG
+  checks.push(luci_call('service', 'list', { name: 'aria2' }).then(r => {
+    if (r?.[1]?.aria2?.instances && Object.values(r[1].aria2.instances).some(i => i.running)) {
+      apps.push({ name: 'AriaNG', url: `http://${host}/ariang`, icon: '⬇️', bg: 'var(--blue-dim)', showInTopbar: false, fav: `http://${host}/ariang/favicon.png` });
+    }
+  }).catch(()=>{}));
+
+  // Universal helper function to verify service presence and assign favicon
+  const checkPort = async (port, name, urlSuffix, icon, bg, favPath = '/favicon.ico') => {
+    try {
+      const r = await file_exec('/usr/bin/curl', ['-s', '-m', '2', '-o', '/dev/null', '-w', '%{http_code}', `http://127.0.0.1:${port}/`]);
+      const code = parseInt((r.stdout || '').trim());
+      if (code > 0 && code < 600) {
+        apps.push({ 
+          name, 
+          url: `http://${host}:${port}${urlSuffix}`, 
+          icon, 
+          bg, 
+          showInTopbar: false, 
+          fav: `http://${host}:${port}${favPath}` 
+        });
+      }
+    } catch(e) {}
+  };
+
+  // Run parallel port checks for extra services
+  checks.push(checkPort(8096, 'Jellyfin', '', '🎬', 'var(--purple-dim)'));
+  checks.push(checkPort(C.cake_stats_port || 11112, 'cake-stats', '', '🍰', 'var(--yellow-dim)'));
+  checks.push(checkPort(8090, 'TorrServer', '', '🧲', 'var(--orange-dim)'));
+  checks.push(checkPort(9091, 'Transmission', '', '🔄', 'var(--red-dim)'));
+  checks.push(checkPort(19999, 'Netdata', '', '📈', 'var(--green-dim)'));
+  checks.push(checkPort(8282, 'MeshMonitor', '', '🌐', 'var(--cyan-dim)'));
+
+  // Wait until all asynchronous status checks settle
+  await Promise.allSettled(checks);
+
+  // Render Topbar Links
+  let topbarHtml = '';
+  const topbarOrder = ['LuCI', 'Mihomo', 'AdGuard', 'WiFi AP'];
+  
+  topbarOrder.forEach(appName => {
+    const app = apps.find(a => a.name === appName && a.showInTopbar);
+    if (app) {
+      topbarHtml += `<a class="tb-link" href="${app.url}" target="_blank" rel="noopener">${app.name}</a>`;
+    }
+  });
+
+  topbarHtml += '<a class="tb-link" href="#" onclick="show_other_services(); return false;" style="color:var(--orange); border-color:var(--border-2);">Other &equiv;</a>';
+
+  const ct = document.getElementById('tb-links-ct');
+  if (ct) ct.innerHTML = topbarHtml;
+
+  // Render the Grid Layout with native Favicons and Emoji fallbacks
+  const grid = document.getElementById('other-services-grid');
+  if (!grid) return;
+
+  let modalHtml = '';
+  apps.sort((a, b) => a.name.localeCompare(b.name));
+  
+  apps.forEach(app => {
+    // The onerror attribute hides the broken image and shows the span with the emoji instead
+    modalHtml += `<a class="srv-btn" href="${app.url}" target="_blank" rel="noopener">
+      <div class="srv-icon" style="background:${app.bg}">
+        <img src="${app.fav}" alt="${app.name} icon" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+        <span class="fallback-icon" style="display:none;">${app.icon}</span>
+      </div>
+      <div class="srv-name">${app.name}</div>
+    </a>`;
+  });
+  
+  grid.innerHTML = modalHtml;
 }
 
 // ===== MODAL =====
