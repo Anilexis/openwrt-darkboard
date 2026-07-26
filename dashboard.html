@@ -2029,8 +2029,25 @@ async function update_mihomo() {
       const all = (g.all || []).length, now_n = g.now || '--', type = g.type || '';
       let alive = 0;
       for (const nn of (g.all || [])) { 
-        const n = groups[nn]; 
-        if (n?.alive || (n?.history?.length > 0 && n.history[n.history.length - 1].delay > 0)) alive++; 
+        const n = groups[nn];
+        if (!n) continue;
+        let isWorking = false;
+        if (n.alive === true) {
+          isWorking = true;
+        } 
+        else if (n.history?.length > 0 && n.history[n.history.length - 1].delay > 0) {
+          isWorking = true;
+        } 
+        else if (n.extra && typeof n.extra === 'object') {
+          for (const key in n.extra) {
+            const h = n.extra[key]?.history;
+            if (h?.length > 0 && h[h.length - 1].delay > 0) { 
+              isWorking = true; 
+              break; 
+            }
+          }
+        }
+        if (isWorking) alive++;
       }
       const tc = type === 'URLTest' ? 'var(--cyan)' : type === 'Fallback' ? 'var(--yellow)' : 'var(--purple)';
       const tl = type === 'URLTest' ? 'url-test' : type === 'Fallback' ? 'fallback' : type === 'Selector' ? 'select' : type.toLowerCase();
