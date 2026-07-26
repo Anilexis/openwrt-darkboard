@@ -2032,18 +2032,18 @@ async function update_mihomo() {
         const n = groups[nn];
         if (!n) continue;
         let isWorking = false;
-        if (n.alive === true) {
-          isWorking = true;
-        } 
-        else if (n.history?.length > 0 && n.history[n.history.length - 1].delay > 0) {
-          isWorking = true;
-        } 
-        else if (n.extra && typeof n.extra === 'object') {
+        if (Array.isArray(n.history) && n.history.length > 0) {
+          if (n.history[n.history.length - 1].delay > 0) isWorking = true;
+        }
+        if (n.alive === true) isWorking = true;
+        if (!isWorking && n.extra && typeof n.extra === 'object') {
           for (const key in n.extra) {
-            const h = n.extra[key]?.history;
-            if (h?.length > 0 && h[h.length - 1].delay > 0) { 
-              isWorking = true; 
-              break; 
+            const arr = n.extra[key];
+            if (Array.isArray(arr) && arr.length > 0) {
+              if (arr[arr.length - 1].delay > 0) {
+                isWorking = true;
+                break;
+              }
             }
           }
         }
