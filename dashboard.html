@@ -2011,44 +2011,67 @@ async function update_mihomo() {
   const H = { 'Content-Type': 'application/json' };
   if (C.mihomo_secret) H['Authorization'] = 'Bearer ' + C.mihomo_secret;
   try {
-    const [cfg_r, prx_r] = await Promise.all([
+    const [cfg_r, prx_r, prov_r] = await Promise.all([
       fetch(C.mihomo_api + '/configs', { headers: H, signal: AbortSignal.timeout(2500) }),
       fetch(C.mihomo_api + '/proxies', { headers: H, signal: AbortSignal.timeout(3000) }),
+      fetch(C.mihomo_api + '/providers/proxies', { headers: H, signal: AbortSignal.timeout(3000) }).catch(() => null)
     ]);
+    
     const mode = (await cfg_r.json()).mode || 'rule';
     const mb = $('mi-mode'); mb.textContent = mode.toUpperCase(); mb.className = 'badge b-cyan';
+    
     const groups = (await prx_r.json()).proxies || {};
+    
+    if (prov_r && prov_r.ok) {
+      try {
+        const provData = (await prov_r.json()).providers || {};
+        for (const p of Object.values(provData)) {
+          if (p.proxies && Array.isArray(p.proxies)) {
+            for (const px of p.proxies) {
+              if (!groups[px.name] || !groups[px.name].history || groups[px.name].history.length === 0) {
+                groups[px.name] = { ...groups[px.name], ...px };
+              }
+            }
+          }
+        }
+      } catch(e) {}
+    }
+    // ------------------------------------
+
     const SKIP_MI = new Set(['PROXY', 'GLOBAL', 'REJECT', 'DIRECT', 'dns-out', 'PASS', 'BLOCK']);
     const GNAMES = Object.entries(groups)
       .filter(([n, g]) => ['Selector', 'URLTest', 'Fallback'].includes(g.type) && !SKIP_MI.has(n))
       .map(([n]) => n)
       .sort();
+    
     let html = '';
     for (const gn of GNAMES) {
       const g = groups[gn]; if (!g) continue;
       const all = (g.all || []).length, now_n = g.now || '--', type = g.type || '';
       let alive = 0;
+      
       for (const nn of (g.all || [])) { 
         const n = groups[nn];
         if (!n) continue;
+        
         let isWorking = false;
-        if (Array.isArray(n.history) && n.history.length > 0) {
-          if (n.history[n.history.length - 1].delay > 0) isWorking = true;
-        }
-        if (n.alive === true) isWorking = true;
-        if (!isWorking && n.extra && typeof n.extra === 'object') {
+        
+        if (Array.isArray(n.history) && n.history.length > 0 && n.history[n.history.length - 1].delay > 0) {
+          isWorking = true;
+        } else if (n.alive === true) {
+          isWorking = true;
+        } else if (n.extra && typeof n.extra === 'object') {
           for (const key in n.extra) {
             const arr = n.extra[key];
-            if (Array.isArray(arr) && arr.length > 0) {
-              if (arr[arr.length - 1].delay > 0) {
-                isWorking = true;
-                break;
-              }
+            if (Array.isArray(arr) && arr.length > 0 && arr[arr.length - 1].delay > 0) {
+              isWorking = true; break;
             }
           }
         }
+        
         if (isWorking) alive++;
       }
+      
       const tc = type === 'URLTest' ? 'var(--cyan)' : type === 'Fallback' ? 'var(--yellow)' : 'var(--purple)';
       const tl = type === 'URLTest' ? 'url-test' : type === 'Fallback' ? 'fallback' : type === 'Selector' ? 'select' : type.toLowerCase();
       html += `<div class="vgrp"><div class="vgh"><span class="vgname">${gn}</span><span class="vgtype" style="color:${tc}">${tl}</span></div>
