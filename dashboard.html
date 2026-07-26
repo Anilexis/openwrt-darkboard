@@ -1904,7 +1904,10 @@ async function update_mihomo() {
       const g = groups[gn]; if (!g) continue;
       const all = (g.all || []).length, now_n = g.now || '--', type = g.type || '';
       let alive = 0;
-      for (const nn of (g.all || [])) { const n = groups[nn]; if (n?.history?.length > 0 && n.history[n.history.length - 1].delay > 0) alive++; }
+      for (const nn of (g.all || [])) { 
+        const n = groups[nn]; 
+        if (n?.alive || (n?.history?.length > 0 && n.history[n.history.length - 1].delay > 0)) alive++; 
+      }
       const tc = type === 'URLTest' ? 'var(--cyan)' : type === 'Fallback' ? 'var(--yellow)' : 'var(--purple)';
       const tl = type === 'URLTest' ? 'url-test' : type === 'Fallback' ? 'fallback' : type === 'Selector' ? 'select' : type.toLowerCase();
       html += `<div class="vgrp"><div class="vgh"><span class="vgname">${gn}</span><span class="vgtype" style="color:${tc}">${tl}</span></div>
