@@ -10,6 +10,10 @@
 <title>OpenWRT DarkBoard — Demo</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="icon" type="image/png" href="./favicon-96x96.png" sizes="96x96" />
+<link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+<link rel="shortcut icon" href="./favicon.ico" />
+<link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png" />
 <style>
 :root {
   --font-mono: 'JetBrains Mono', 'Consolas', 'SF Mono', monospace;
@@ -26,13 +30,13 @@
   --text:      #c6cfca;
   --text-muted:#859e92;
   --text-faint:#52635d;
-  --green:     #38b562; --green-dim: #193b25;
-  --yellow:    #cfa040; --yellow-dim:#6e4e10;
-  --red:       #de4f4f; --red-dim:   #5e1e1e;
-  --blue:      #4a94e8; --blue-dim:  #192f54;
-  --cyan:      #35c4b4; --cyan-dim:  #174d47;
-  --purple:    #9268d8;
-  --orange:    #d88838;
+  --green:     #38b562; --green-dim: #287d45;
+  --yellow:    #cfa040; --yellow-dim:#96732e;
+  --red:       #de4f4f; --red-dim:   #8f3434;
+  --blue:      #4a94e8; --blue-dim:  #2c5a8f;
+  --cyan:      #35c4b4; --cyan-dim:  #299387;
+  --purple:    #9268d8; --purple-dim:#593b89;
+  --orange:    #d88838; --orange-dim:#975c21;
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--font-mono);font-size:var(--text-base);line-height:1.4;-webkit-font-smoothing:antialiased;}
@@ -58,7 +62,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .tb-link:hover{color:var(--cyan);border-color:var(--cyan-dim);}
 
 /* ============================================================ DASH WRAPPER */
-.dash{display:flex;flex-direction:column;height:100vh;width:100vw;overflow:hidden;}
+.dash{display:flex;flex-direction:column;height:100vh;width:100vw;overflow:hidden;max-width: 1600px;margin:0 auto;}
 
 /* ============================================================ DESKTOP GRID */
 .grid{
@@ -106,6 +110,25 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .b-err{background:var(--red-dim);color:var(--red);}
 .b-cyan{background:var(--cyan-dim);color:var(--cyan);}
 
+/* ============================================================ INTERFACES */
+.if-role-box { display: flex; gap: 4px; align-items: center; }
+.role-btn {
+  font-size: var(--text-xxs);
+  padding: 1px 4px;
+  border: 1px solid var(--border-2);
+  border-radius: 2px;
+  color: var(--text-faint);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.role-btn:hover { border-color: var(--cyan); color: var(--text-muted); }
+.role-btn.active {
+  background: var(--cyan-dim);
+  color: var(--cyan);
+  border-color: var(--cyan);
+  font-weight: 700;
+}
+
 /* ============================================================ METRIC */
 .met{display:flex;align-items:baseline;justify-content:space-between;gap:8px;font-size:var(--text-sm);line-height:1.3;}
 .ml{color:var(--text-muted);white-space:nowrap;flex-shrink:0;}
@@ -118,18 +141,70 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .blr{display:flex;justify-content:space-between;font-size:var(--text-xs);color:var(--text-muted);margin-bottom:1px;}
 .blr .bv{color:var(--text);font-variant-numeric:tabular-nums;}
 .bar{height:4px;background:var(--surface-3);border-radius:1px;overflow:hidden;position:relative;}
-.bar-max{position:absolute;top:0;bottom:0;width:2px;background:rgba(255,255,255,0.18);border-radius:1px;pointer-events:none;}
-.corebar-max{position:absolute;left:0;right:0;height:2px;background:rgba(255,255,255,0.18);border-radius:1px;pointer-events:none;}
+.bar-max{position:absolute;top:0;bottom:0;width:2px;background:rgba(255,255,255,0.18);border-radius:1px;pointer-events:none;transition:left .5s ease;}
+.corebar-max{position:absolute;left:0;right:0;height:2px;background:rgba(255,255,255,0.18);border-radius:1px;pointer-events:none;transition:bottom .5s ease;}
 .core-maxval{font-size:var(--text-xxs);color:var(--text-faint);font-variant-numeric:tabular-nums;}
-.bf{height:100%;border-radius:1px;background:var(--green);}
+.bf{height:100%;border-radius:1px;transition:width 0.8s cubic-bezier(0.4,0,0.2,1),background-color 0.5s ease;background:var(--green);}
 .bf.warn{background:var(--yellow);}.bf.err{background:var(--red);}
 .bf.blue{background:var(--blue);}.bf.cyan{background:var(--cyan);}.bf.purple{background:var(--purple);}
+
+/* ============================================================ OTHER SERVICES MODAL */
+.services-grid {display: grid;grid-template-columns:repeat(auto-fill, minmax(100px, 1fr));gap: 12px;  margin-top: 10px;}
+.srv-btn {display: flex;flex-direction: column;align-items: center;justify-content: center;background: var(--surface-3);border: 1px solid var(--border);border-radius: 8px;padding: 16px 8px;text-decoration: none;color: var(--text); transition: all 0.2s; cursor: pointer;}
+.srv-btn:hover {border-color: var(--cyan);background: var(--surface-2);transform: translateY(-2px);box-shadow: 0 4px 12px rgba(0,0,0,0.5);}
+.srv-icon {width: 44px;height: 44px;border-radius: 12px;display: flex;align-items: center;justify-content: center;font-size: 24px;margin-bottom: 10px;border: 1px solid var(--border-2);box-shadow: inset 0 2px 4px rgba(255,255,255,0.05);}
+.srv-name {font-size: var(--text-xs);font-weight: 500;text-align: center;}
+.srv-icon img {width: 28px;height: 28px;object-fit: contain;}
+.fallback-icon {font-size: 24px;line-height: 1;}
+
+/* ============================================================ SETUP MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;display:flex;align-items:center;justify-content:center;}
+.modal-overlay.hidden{display:none;}
+.modal-box{background:var(--surface-2);border:1px solid var(--border);border-radius:6px;padding:24px 28px;min-width:340px;max-width:520px;width:90%;max-height:90vh;overflow-y:auto;}
+.modal-title{font-size:0.85rem;font-weight:600;color:var(--text);margin-bottom:4px;letter-spacing:.03em;}
+.modal-sub{font-size:var(--text-xs);color:var(--text-faint);margin-bottom:18px;line-height:1.5;}
+.modal-section{font-size:var(--text-xs);color:var(--cyan);font-weight:600;margin:14px 0 6px;padding-top:8px;border-top:1px solid var(--border);letter-spacing:.05em;text-transform:uppercase;}
+.modal-section:first-of-type{border-top:none;margin-top:4px;padding-top:0;}
+.modal-field{margin-bottom:10px;}
+.modal-field label{display:block;font-size:var(--text-xs);color:var(--text-muted);margin-bottom:3px;}
+.modal-field input{width:100%;box-sizing:border-box;background:var(--surface-3);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:var(--text-sm);padding:6px 9px;outline:none;font-family:var(--font-mono);}
+.modal-field input:focus{border-color:var(--cyan);}
+.modal-field input::placeholder{color:var(--text-faint);}
+.modal-row{display:flex;gap:8px;}
+.modal-row .modal-field{flex:1;}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:18px;}
+.modal-btn{padding:6px 18px;border-radius:4px;border:none;font-size:var(--text-sm);cursor:pointer;font-weight:500;font-family:var(--font-mono);}
+.modal-btn.primary{background:var(--cyan);color:#000;}
+.modal-btn.secondary{background:var(--surface-3);color:var(--text-muted);border:1px solid var(--border);}
+.modal-btn.danger{background:var(--red-dim);color:var(--red);border:1px solid var(--red-dim);}
+.modal-btn.danger:hover{background:var(--red);color:#000;}
+
+/* LATENCY FILTER MODAL */
+.lat-check-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--text-sm);
+  color: var(--text);
+  cursor: pointer;
+  padding: 3px 0;
+}
+.lat-check-row input[type=checkbox] {
+  accent-color: var(--cyan);
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.lat-check-row:hover {
+  color: var(--cyan);
+}
 
 /* ============================================================ CPU CORES */
 .cores{display:grid;grid-template-columns:repeat(4,1fr);gap:2px;margin-top:2px;}
 .core{font-size:var(--text-xs);text-align:center;}
 .corebar{height:26px;background:var(--surface-3);border-radius:1px;position:relative;overflow:hidden;margin-bottom:1px;}
-.corefill{position:absolute;bottom:0;left:0;right:0;border-radius:1px;}
+.corefill{position:absolute;bottom:0;left:0;right:0;transition:height .8s ease;border-radius:1px;}
 .corelbel{color:var(--text-muted);}
 .coreval{font-variant-numeric:tabular-nums;}
 
@@ -142,6 +217,9 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 }
 .svc-action:hover{color:var(--cyan);background:var(--cyan-dim);}
 .svc-action:active{color:var(--green);}
+.svc-action.spinning{animation:spin .6s linear infinite;pointer-events:none;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.log-line{font-size:9px;color:var(--text-muted);font-family:var(--font-mono);line-height:1.3;word-break:break-all;margin-bottom:1px;}
 .dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
 .dot.ok{background:var(--green);box-shadow:0 0 4px var(--green);}
 .dot.err{background:var(--red);box-shadow:0 0 4px var(--red);}
@@ -172,18 +250,19 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .ifr2 .rx{color:var(--cyan);}.ifr2 .tx{color:var(--orange);}
 .ifr2 .er{color:var(--red);}
 .ifr2 span{color:var(--text-muted);}
+/* Dynamic traffic color helpers applied via JS */
 .rx-dim{color:var(--text-faint)!important;}
-.rx-lo{color:#1e6e65!important;}
+.rx-lo{color:var(--cyan-dim)!important;}
 .rx-mid{color:var(--cyan)!important;}
 .rx-hi{color:#50e8d6!important;text-shadow:0 0 8px rgba(53,196,180,.7);}
 .tx-dim{color:var(--text-faint)!important;}
-.tx-lo{color:#7a4a18!important;}
+.tx-lo{color:var(--orange-dim)!important;}
 .tx-mid{color:var(--orange)!important;}
 .tx-hi{color:#f0a855!important;text-shadow:0 0 8px rgba(216,136,56,.7);}
 
 /* ============================================================ PING */
 .pbar{flex:2;height:4px;background:var(--surface-3);border-radius:1px;overflow:hidden;}
-.pbf{height:100%;border-radius:1px;}
+.pbf{height:100%;border-radius:1px;transition:width .8s ease;}
 .pval{font-variant-numeric:tabular-nums;width:42px;text-align:right;font-size:var(--text-xs);}
 .pval.ok{color:var(--green);}.pval.warn{color:var(--yellow);}.pval.err{color:var(--red);}.pval.cyan{color:var(--cyan);}
 
@@ -197,13 +276,19 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
   display:flex;align-items:center;gap:4px;
   padding:2px 0;border-bottom:1px solid var(--border);
   font-size:var(--text-xs);
+  cursor:pointer;
+  transition: background 0.15s;
+}
+.client-row:hover {
+  background: var(--surface-3);
 }
 .client-row:last-child{border-bottom:none;}
 .cicon{width:30px;text-align:left;flex-shrink:0;font-style:normal;font-size:var(--text-xxs);font-weight:700;}
-.cicon.w5{color:var(--cyan);}
+.cicon.w5{color:var(--orange);}
 .cicon.w24{color:var(--yellow);}
 .cicon.eth{color:var(--blue);}
 .cicon.ap{color:var(--purple);}
+.cicon.tv{color:var(--cyan);}
 .cname{flex:1;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .cip{color:var(--text-muted);font-variant-numeric:tabular-nums;white-space:nowrap;margin-left:auto;padding-left:3px;}
 
@@ -218,6 +303,29 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 .wlink{color:var(--text-faint);text-decoration:none;font-size:var(--text-xxs);}
 .wlink:hover{color:var(--cyan);}
 
+/* Signal strength bars */
+.sig-bars {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 1px;
+  height: 10px;
+  width: 12px;
+  margin-left: 5px;
+}
+.sig-bars div {
+  width: 3px;
+  background: var(--border-2);
+  border-radius: 1px;
+}
+.sig-bars .b1 { height: 40%; }
+.sig-bars .b2 { height: 70%; }
+.sig-bars .b3 { height: 100%; }
+
+/* Color states for signal bars */
+.sig-bars.lvl-3 .b1, .sig-bars.lvl-3 .b2, .sig-bars.lvl-3 .b3 { background: var(--green); }
+.sig-bars.lvl-2 .b1, .sig-bars.lvl-2 .b2 { background: var(--yellow); }
+.sig-bars.lvl-1 .b1 { background: var(--red); }
+
 /* ============================================================ SHARED */
 hr{border:none;border-top:1px solid var(--border);margin:2px 0;}
 .si{flex:1;overflow-y:auto;overflow-x:hidden;scrollbar-width:none;min-height:0;}
@@ -227,30 +335,13 @@ hr{border:none;border-top:1px solid var(--border);margin:2px 0;}
 .footer{position:fixed;bottom:0;right:4px;font-size:var(--text-xxs);color:var(--text-faint);z-index:10;}
 .footer a{color:var(--text-faint);text-decoration:none;}
 
-/* ============================================================ TABLETS */
-@media (max-width:1024px) and (min-width:769px){
-  .grid{
-    grid-template-columns: 1fr 1fr;
-    grid-template-rows:auto;
-    grid-auto-rows:minmax(200px,auto);
-    grid-template-areas:
-      "cpu      memory"
-      "storage  services"
-      "ifaces   latency"
-      "wan      clients"
-      "mihomo   adguard"
-      "wifi     wifi";
-  }
-  .panel{min-height:200px;}
-}
-
 /* ============================================================ MOBILE 768px */
 @media (max-width:768px){
   html,body{height:auto;overflow:auto;}
   .dash{height:auto;overflow:visible;}
-  .topbar{height:auto;flex-direction:column;align-items:flex-start;padding:4px 8px;gap:3px;}
+  .topbar{height:auto;flex-direction:row;align-items:center;flex-wrap:wrap;padding:3px 8px;gap:4px;}
   .tb-l,.tb-r{flex-wrap:wrap;gap:5px;font-size:var(--text-xxs);}
-  .tb-r{margin-left:auto;justify-content:flex-end;}
+  .tb-r{margin-left:auto;justify-content:flex-end;flex-wrap:nowrap;}
   .tb-links{margin-left:0;flex-wrap:wrap;}
   .grid{
     flex:none;height:auto;
@@ -260,8 +351,8 @@ hr{border:none;border-top:1px solid var(--border);margin:2px 0;}
     grid-template-areas:
       "cpu     memory   storage"
       "ifaces  latency  wan"
-      "clients mihomo   adguard"
-      "services services wifi";
+      "clients mihomo   services"
+      "wifi    adguard  services";
     gap:1px;
   }
   .panel{min-height:170px;}
@@ -275,20 +366,18 @@ hr{border:none;border-top:1px solid var(--border);margin:2px 0;}
     grid-template-columns:1fr 1fr;
     grid-auto-rows:minmax(150px,auto);
     grid-template-areas:
-      "cpu     memory"
-      "storage storage"
-      "ifaces  ifaces"
-      "latency wan"
-      "clients clients"
-      "mihomo  adguard"
-      "services services"
-      "wifi    wifi";
+      "cpu      memory"
+      "storage  wan"
+      "ifaces   clients"
+      "latency  mihomo"
+      "services adguard"
+      "services wifi";
   }
   .panel{min-height:150px;}
 }
 
 /* ============================================================ ULTRAWIDE 4K */
-@media (min-width:1920px){
+@media (min-width:1600px){
   body{display:flex;justify-content:center;background:#000;}
   .dash{max-width:1600px;width:100%;border-left:1px solid var(--border);border-right:1px solid var(--border);box-shadow:0 0 50px rgba(0,0,0,0.5);}
 }
@@ -302,30 +391,33 @@ hr{border:none;border-top:1px solid var(--border);margin:2px 0;}
     <div class="tb-l">
       <span class="tb-title">DarkBoard</span>
       <span class="tb-sep">|</span>
-      <span>GATEWAY</span>
+      <span id="tb-host">GATEWAY</span>
       <span class="tb-sep">|</span>
-      <span style="color:var(--text-muted)">kernel 6.12.71</span>
+      <span id="tb-fw" style="color:var(--text-muted)">25.12.0 r32713-f919e7899d</span>
       <span class="tb-sep">|</span>
-      <span style="color:var(--text-muted)">25.12.0 r32713-f919e7899d</span>
-      <span class="tb-links">
-        <a class="tb-link" href="#" onclick="return false">LuCI</a>
-        <a class="tb-link" href="#" onclick="return false">Metacubexd</a>
-        <a class="tb-link" href="#" onclick="return false">AdGuard</a>
-        <a class="tb-link" href="#" onclick="return false">WiFi AP</a>
+      <span id="tb-kernel" style="color:var(--text-muted)">kernel 6.12.71</span>
+      <span class="tb-links" id="tb-links-ct">
+        <a class="tb-link" href="#" onclick="return false;">LuCI</a>
+        <a class="tb-link" href="#" onclick="return false;">Mihomo</a>
+        <a class="tb-link" href="#" onclick="return false;">AdGuard</a>
+        <a class="tb-link" href="#" onclick="return false;">WiFi AP</a>
+        <a class="tb-link" href="#" onclick="show_other_services(); return false;" style="color:var(--orange); border-color:var(--border-2);">Other &equiv;</a>
       </span>
     </div>
     <div class="tb-r">
-      <span style="cursor:pointer;color:var(--text-faint)" title="Settings (demo)">&#9881;</span>
+      <span style="cursor:pointer;color:var(--text-faint)" onclick="show_setup()" title="Settings / Credentials">&#9881;</span>
       <span class="tb-sep">|</span>
-      <span>uptime <span class="tb-uptime">01:19:57</span></span>
+      <span style="white-space:nowrap">uptime <span id="tb-up" class="tb-uptime">01:19:57</span></span>
       <span class="tb-sep">|</span>
-      <span style="color:var(--green)">52&#176;C</span>
+      <span id="tb-temp" style="color:var(--green)">52&deg;C</span>
       <span class="tb-sep">|</span>
-      <span style="color:var(--text-muted);display:inline-block;min-width:160px;white-space:nowrap">WAN <span style="color:var(--cyan)">&#8595;42K/s</span> <span style="color:var(--orange)">&#8593;73K/s</span></span>
+      <span id="tb-wan-rx" style="color:var(--text-muted);display:inline-block;min-width:20ch;white-space:nowrap">WAN <span style="color:var(--cyan)">&darr;42.3K/s</span> <span style="color:var(--orange)">&uarr;73.8K/s</span></span>
       <span class="tb-sep">|</span>
-      <span class="tb-clock" id="tb-clk">--:--:--</span>
-      <span style="color:var(--text-muted)" title="last NTP sync">ntp:ok</span>
-      <span class="live"></span>
+      <span style="display:inline-flex;align-items:center;gap:4px;white-space:nowrap;flex-shrink:0;">
+        <span class="tb-clock" id="tb-clk">--:--:--</span>
+        <span id="tb-ntp" style="color:var(--text-muted)" title="last NTP sync">ntp:ok</span>
+        <span class="live"></span>
+      </span>
     </div>
   </div>
 
@@ -334,330 +426,115 @@ hr{border:none;border-top:1px solid var(--border);margin:2px 0;}
 
     <!-- R1 C1 - CPU -->
     <div class="panel cell-cpu">
-      <div class="ptitle">CPU <span class="badge b-ok">5%</span></div>
-      <div class="cores">
-        <div class="core">
-          <div class="corebar"><div class="corefill" style="height:5%;background:var(--green)"></div><div class="corebar-max" style="bottom:12%"></div></div>
-          <div class="corelbel">C0</div>
-          <div class="coreval" style="color:var(--green)">5%</div>
-          <div class="core-maxval">max 12%</div>
-        </div>
-        <div class="core">
-          <div class="corebar"><div class="corefill" style="height:2%;background:var(--green)"></div><div class="corebar-max" style="bottom:14%"></div></div>
-          <div class="corelbel">C1</div>
-          <div class="coreval" style="color:var(--green)">2%</div>
-          <div class="core-maxval">max 14%</div>
-        </div>
-        <div class="core">
-          <div class="corebar"><div class="corefill" style="height:7%;background:var(--green)"></div><div class="corebar-max" style="bottom:14%"></div></div>
-          <div class="corelbel">C2</div>
-          <div class="coreval" style="color:var(--green)">7%</div>
-          <div class="core-maxval">max 14%</div>
-        </div>
-        <div class="core">
-          <div class="corebar"><div class="corefill" style="height:5%;background:var(--green)"></div><div class="corebar-max" style="bottom:18%"></div></div>
-          <div class="corelbel">C3</div>
-          <div class="coreval" style="color:var(--green)">5%</div>
-          <div class="core-maxval">max 18%</div>
-        </div>
-      </div>
+      <div class="ptitle">CPU <span class="badge b-ok" id="cpu-bdg">5%</span></div>
+      <div class="cores" id="cpu-cores"></div>
       <hr>
-      <div class="met"><span class="ml">load 1m</span><span class="mv">0.01</span></div>
-      <div class="met"><span class="ml">load 5m</span><span class="mv">0.10</span></div>
-      <div class="met"><span class="ml">load 15m</span><span class="mv">0.08</span></div>
+      <div class="met"><span class="ml">load 1m</span><span class="mv" id="ld1">0.01</span></div>
+      <div class="met"><span class="ml">load 5m</span><span class="mv" id="ld5">0.10</span></div>
+      <div class="met"><span class="ml">load 15m</span><span class="mv" id="ld15">0.08</span></div>
       <hr>
-      <div class="met"><span class="ml">tasks</span><span class="mv muted">176 tasks, 1 run</span></div>
-      <div class="met"><span class="ml">active conns</span><span class="mv blue">719</span></div>
-      <div class="met"><span class="ml">ct max</span><span class="mv muted">262,144</span></div>
-      <div class="bw"><div class="bar" style="height:5px"><div class="bf blue" style="width:0.3%"></div></div></div>
-      <div class="met"><span class="ml">nft tables</span><span class="mv muted">4t 64c 155r</span></div>
+      <div class="met"><span class="ml">tasks</span><span class="mv muted" id="tasks-d">176 tasks, 1 run</span></div>
+      <div class="met"><span class="ml">active conns</span><span class="mv blue" id="ct-act">719</span></div>
+      <div class="met"><span class="ml">ct max</span><span class="mv muted" id="ct-max">262,144</span></div>
+      <div class="bw"><div class="bar" style="height:5px"><div class="bf blue" id="ct-bar" style="width:0.3%"></div></div></div>
+      <div class="met"><span class="ml">nft tables</span><span class="mv muted" id="nft-d">4t 64c 155r</span></div>
     </div>
 
     <!-- R1 C2 - MEMORY -->
     <div class="panel cell-memory">
       <div class="ptitle">MEMORY</div>
-      <div class="bw"><div class="blr"><span>RAM used</span><span class="bv">440 MB / 7718 MB</span></div><div class="bar"><div class="bf" style="width:5.7%"></div><div class="bar-max" style="left:5.7%"></div></div></div>
-      <div class="bw"><div class="blr"><span>buffers</span><span class="bv">18 MB</span></div><div class="bar"><div class="bf blue" style="width:0.2%"></div><div class="bar-max" style="left:0.2%"></div></div></div>
-      <div class="bw"><div class="blr"><span>cached</span><span class="bv">122 MB</span></div><div class="bar"><div class="bf cyan" style="width:1.6%"></div><div class="bar-max" style="left:1.6%"></div></div></div>
+      <div class="bw"><div class="blr"><span>RAM used</span><span class="bv" id="ram-v">440 MB / 7718 MB</span></div><div class="bar"><div class="bf" id="ram-b" style="width:5.7%"></div><div class="bar-max" id="ram-max-bar" style="left:5.7%"></div></div></div>
+      <div class="bw"><div class="blr"><span>buffers</span><span class="bv" id="buf-v">18 MB</span></div><div class="bar"><div class="bf blue" id="buf-b" style="width:0.2%"></div><div class="bar-max" id="buf-max-bar" style="left:0.2%"></div></div></div>
+      <div class="bw"><div class="blr"><span>cached</span><span class="bv" id="cch-v">122 MB</span></div><div class="bar"><div class="bf cyan" id="cch-b" style="width:1.6%"></div><div class="bar-max" id="cch-max-bar" style="left:1.6%"></div></div></div>
       <hr>
-      <div class="bw"><div class="blr"><span>SWAP</span><span class="bv">none</span></div><div class="bar"><div class="bf purple" style="width:0%"></div></div></div>
+      <div class="bw"><div class="blr"><span>SWAP</span><span class="bv" id="swp-v">none</span></div><div class="bar"><div class="bf purple" id="swp-b" style="width:0%"></div><div class="bar-max" id="swp-max-bar" style="left:0%"></div></div></div>
       <hr>
-      <div class="met"><span class="ml">free</span><span class="mv ok">7270 MB</span></div>
-      <div class="met"><span class="ml">available</span><span class="mv cyan">7304 MB</span></div>
+      <div class="met"><span class="ml">free</span><span class="mv ok" id="ram-free">7270 MB</span></div>
+      <div class="met"><span class="ml">available</span><span class="mv cyan" id="ram-avail">7304 MB</span></div>
     </div>
 
     <!-- R1 C3 - STORAGE -->
     <div class="panel cell-storage">
-      <div class="ptitle">STORAGE <span style="font-size:var(--text-xxs);color:var(--text-faint);font-weight:400;letter-spacing:0;text-transform:none">NVMe 52&#176;</span></div>
-      <div class="si">
-        <div class="bw" style="margin-bottom:3px">
-          <div class="blr"><span>/</span><span style="color:var(--text-faint)">root</span><span class="bv">285M / 246.86G</span></div>
-          <div class="bar"><div class="bf" style="width:0.1%"></div></div>
-        </div>
-        <div class="bw" style="margin-bottom:3px">
-          <div class="blr"><span>/boot</span><span style="color:var(--text-faint)">nvme0n1p1</span><span class="bv">6M / 17M</span></div>
-          <div class="bar"><div class="bf warn" style="width:35%"></div></div>
+      <div class="ptitle">
+        <span>STORAGE <span id="nvme-temp" style="font-size:var(--text-xxs);color:var(--text-faint);font-weight:400;letter-spacing:0;text-transform:none">NVMe 52&deg;</span></span>
+        <div class="ptitle-r">
+          <label style="display:flex;align-items:center;gap:4px;font-size:var(--text-xxs);color:var(--text-faint);font-weight:400;letter-spacing:0;text-transform:none;cursor:pointer;" title="Show physical disks only">
+            <input type="checkbox" id="storage-filter-cb" onchange="toggleStorageFilter()" style="accent-color:var(--cyan);margin:0;width:11px;height:11px;cursor:pointer;flex-shrink:0;">
+            compact
+          </label>
         </div>
       </div>
+      <div class="si" id="disk-p"></div>
     </div>
 
     <!-- R1-R2 C4 - SERVICES -->
     <div class="panel cell-services">
-      <div class="ptitle">SERVICES<div class="ptitle-r"><button class="svc-action" title="Reboot router (demo)">&#x23FB;</button></div></div>
-      <div class="si">
-        <div class="svc"><button class="svc-action">&#8635;</button><button class="svc-action">&#9776;</button><div class="dot ok"></div><span class="sname">LuCI (uhttpd)</span><span class="sstatus ok">UP</span></div>
-        <div class="svc"><button class="svc-action">&#8635;</button><button class="svc-action">&#9776;</button><div class="dot ok"></div><span class="sname">Network</span><span class="sstatus ok">UP</span></div>
-        <div class="svc"><button class="svc-action">&#8635;</button><button class="svc-action">&#9776;</button><div class="dot ok"></div><span class="sname">dnsmasq</span><span class="sstatus ok">UP</span></div>
-        <div class="svc"><button class="svc-action">&#8635;</button><button class="svc-action">&#9776;</button><div class="dot ok"></div><span class="sname">SSH</span><span class="sstatus ok">UP</span></div>
-        <div class="svc"><button class="svc-action">&#8635;</button><button class="svc-action">&#9776;</button><div class="dot ok"></div><span class="sname">rpcd</span><span class="sstatus ok">UP</span></div>
-        <div class="svc"><button class="svc-action">&#8635;</button><button class="svc-action">&#9776;</button><div class="dot ok"></div><span class="sname">ntpd</span><span class="sstatus ok">UP</span></div>
-        <div class="svc"><button class="svc-action">&#8635;</button><button class="svc-action">&#9776;</button><div class="dot ok"></div><span class="sname">crond</span><span class="sstatus ok">UP</span></div>
-        <div class="svc"><button class="svc-action">&#8635;</button><button class="svc-action">&#9776;</button><div class="dot ok"></div><span class="sname">mwan3</span><span class="sstatus ok">UP</span></div>
-        <div class="svc"><button class="svc-action">&#8635;</button><button class="svc-action">&#9776;</button><div class="dot ok"></div><span class="sname">Web Terminal</span><span class="sstatus ok">UP</span></div>
-        <div class="svc"><button class="svc-action">&#8635;</button><button class="svc-action">&#9776;</button><div class="dot ok"></div><span class="sname">nikki (mihomo)</span><span class="sstatus ok">UP</span></div>
-        <div class="svc"><button class="svc-action">&#8635;</button><button class="svc-action">&#9776;</button><div class="dot ok"></div><span class="sname">AdGuard Home</span><span class="sstatus ok">UP</span></div>
-        <div class="svc"><button class="svc-action">&#8635;</button><button class="svc-action">&#9776;</button><div class="dot ok"></div><span class="sname">collectd</span><span class="sstatus ok">UP</span></div>
-        <div class="svc"><button class="svc-action">&#8635;</button><button class="svc-action">&#9776;</button><div class="dot ok"></div><span class="sname">opentracker</span><span class="sstatus ok">UP</span></div>
-        <div class="svc"><button class="svc-action">&#8635;</button><button class="svc-action">&#9776;</button><div class="dot warn"></div><span class="sname">firewall</span><span class="sstatus" style="color:var(--yellow)">LOADED</span></div>
-        <div class="svc"><button class="svc-action">&#8635;</button><button class="svc-action">&#9776;</button><div class="dot warn"></div><span class="sname">SQM/CAKE</span><span class="sstatus" style="color:var(--yellow)">LOADED</span></div>
-      </div>
+      <div class="ptitle">SERVICES<div class="ptitle-r"><button class="svc-action" title="Reboot router (demo)" onclick="reboot_router(this)">&#x23FB;</button></div></div>
+      <div class="si" id="svc-p"></div>
     </div>
 
     <!-- R2 C1 - INTERFACES -->
     <div class="panel cell-interfaces">
-      <div class="ptitle">INTERFACES <span style="font-size:var(--text-xs);color:var(--text-faint)">ct: 719</span></div>
-      <div class="si">
-        <div class="iface">
-          <div class="ifr1"><span class="ifname up">eth0</span><span class="ifspd">1G</span><span class="iflink">UP</span></div>
-          <div class="ifr2"><span class="rx rx-lo">&#8595;42K/s</span><span class="tx tx-lo">&#8593;73K/s</span><span style="margin-left:auto;color:var(--text-faint)">642M/83M</span></div>
-        </div>
-        <div class="iface">
-          <div class="ifr1"><span class="ifname down">eth1</span><span class="iflink">DOWN</span></div>
-          <div class="ifr2"><span class="rx rx-dim">&#8595;0B/s</span><span class="tx tx-dim">&#8593;0B/s</span><span style="margin-left:auto;color:var(--text-faint)">0/0</span></div>
-        </div>
-        <div class="iface">
-          <div class="ifr1"><span class="ifname up">eth2</span><span class="ifspd">2.5G</span><span class="iflink">UP</span></div>
-          <div class="ifr2"><span class="rx rx-lo">&#8595;421K/s</span><span class="tx tx-mid">&#8593;1156K/s</span><span style="margin-left:auto;color:var(--text-faint)">54M/513M</span></div>
-        </div>
-        <div class="iface">
-          <div class="ifr1"><span class="ifname down">eth3</span><span class="iflink">DOWN</span></div>
-          <div class="ifr2"><span class="rx rx-dim">&#8595;0B/s</span><span class="tx tx-dim">&#8593;0B/s</span><span style="margin-left:auto;color:var(--text-faint)">0/0</span></div>
-        </div>
-        <div class="iface">
-          <div class="ifr1"><span class="ifname up">eth4</span><span class="ifspd">2.5G</span><span class="iflink">UP</span></div>
-          <div class="ifr2"><span class="rx rx-dim">&#8595;4872B/s</span><span class="tx tx-lo">&#8593;73K/s</span><span style="margin-left:auto;color:var(--text-faint)">16M/32M</span></div>
-        </div>
-        <div class="iface">
-          <div class="ifr1"><span class="ifname up">eth5</span><span class="ifspd">100M</span><span class="iflink">UP</span></div>
-          <div class="ifr2"><span class="rx rx-dim">&#8595;408B/s</span><span class="tx tx-lo">&#8593;72K/s</span><span style="margin-left:auto;color:var(--text-faint)">3M/31M</span></div>
+      <div class="ptitle">
+        INTERFACES <span style="font-size:var(--text-xs);color:var(--text-faint)" id="ct-bdg">ct: 719</span>
+        <div class="ptitle-r">
+          <button class="svc-action" id="iface-edit-btn" title="Setup Roles" onclick="toggleIfaceEdit()">&#9881;</button>
         </div>
       </div>
+      <div class="si" id="net-p"></div>
     </div>
 
     <!-- R2 C2 - LATENCY -->
     <div class="panel cell-latency">
-      <div class="ptitle">LATENCY</div>
-      <div class="si">
-        <div class="ds" style="margin-bottom:3px"><span class="dl">last check</span><span class="dv" style="color:var(--text-faint)">01:20:14</span></div>
-
-        <!-- DIRECT (ISP) -->
-        <div style="margin-bottom:3px">
-          <div style="font-size:var(--text-xs);color:var(--text-muted);margin-bottom:1px">DIRECT (ISP)</div>
-          <div style="display:flex;gap:4px;align-items:center;margin-bottom:1px">
-            <span style="font-size:var(--text-xxs);color:var(--text-faint);width:18px;flex-shrink:0">cf</span>
-            <div class="pbar" style="flex:1;position:relative"><div class="pbf" style="width:12.8%;background:var(--green)"></div><div style="position:absolute;top:0;bottom:0;left:12.8%;width:2px;background:rgba(255,255,255,0.18);border-radius:1px"></div></div>
-            <span class="pval ok">64ms</span>
-          </div>
-          <div style="display:flex;gap:4px;align-items:center;margin-bottom:1px">
-            <span style="font-size:var(--text-xxs);color:var(--text-faint);width:18px;flex-shrink:0">ggl</span>
-            <div class="pbar" style="flex:1;position:relative"><div class="pbf" style="width:10.2%;background:var(--green)"></div><div style="position:absolute;top:0;bottom:0;left:10.2%;width:2px;background:rgba(255,255,255,0.18);border-radius:1px"></div></div>
-            <span class="pval ok">51ms</span>
-          </div>
-          <div style="display:flex;gap:4px;align-items:center;margin-bottom:1px">
-            <span style="font-size:var(--text-xxs);color:var(--text-faint);width:18px;flex-shrink:0">ya</span>
-            <div class="pbar" style="flex:1;position:relative"><div class="pbf" style="width:8.4%;background:var(--cyan)"></div><div style="position:absolute;top:0;bottom:0;left:8.4%;width:2px;background:rgba(255,255,255,0.18);border-radius:1px"></div></div>
-            <span class="pval cyan">42ms</span>
-          </div>
-        </div>
-
-        <!-- AUTO-FOREIGN-POOL -->
-        <div style="margin-bottom:3px">
-          <div style="font-size:var(--text-xs);color:var(--text-muted);margin-bottom:1px">AUTO-FOREIGN-POOL</div>
-          <div style="display:flex;gap:4px;align-items:center;margin-bottom:1px">
-            <span style="font-size:var(--text-xxs);color:var(--text-faint);width:18px;flex-shrink:0">cf</span>
-            <div class="pbar" style="flex:1;position:relative"><div class="pbf" style="width:12%;background:var(--green)"></div><div style="position:absolute;top:0;bottom:0;left:12%;width:2px;background:rgba(255,255,255,0.18);border-radius:1px"></div></div>
-            <span class="pval ok">60ms</span>
-          </div>
-          <div style="display:flex;gap:4px;align-items:center;margin-bottom:1px">
-            <span style="font-size:var(--text-xxs);color:var(--text-faint);width:18px;flex-shrink:0">ggl</span>
-            <div class="pbar" style="flex:1;position:relative"><div class="pbf" style="width:17.6%;background:var(--green)"></div><div style="position:absolute;top:0;bottom:0;left:17.6%;width:2px;background:rgba(255,255,255,0.18);border-radius:1px"></div></div>
-            <span class="pval ok">88ms</span>
-          </div>
-          <div style="display:flex;gap:4px;align-items:center;margin-bottom:1px">
-            <span style="font-size:var(--text-xxs);color:var(--text-faint);width:18px;flex-shrink:0">ya</span>
-            <div class="pbar" style="flex:1;position:relative"><div class="pbf" style="width:14%;background:var(--green)"></div><div style="position:absolute;top:0;bottom:0;left:14%;width:2px;background:rgba(255,255,255,0.18);border-radius:1px"></div></div>
-            <span class="pval ok">70ms</span>
-          </div>
-        </div>
-
-        <!-- CASCADE-AI -->
-        <div style="margin-bottom:3px">
-          <div style="font-size:var(--text-xs);color:var(--text-muted);margin-bottom:1px">CASCADE-AI</div>
-          <div style="display:flex;gap:4px;align-items:center;margin-bottom:1px">
-            <span style="font-size:var(--text-xxs);color:var(--text-faint);width:18px;flex-shrink:0">cf</span>
-            <div class="pbar" style="flex:1;position:relative"><div class="pbf" style="width:22.6%;background:var(--yellow)"></div><div style="position:absolute;top:0;bottom:0;left:22.6%;width:2px;background:rgba(255,255,255,0.18);border-radius:1px"></div></div>
-            <span class="pval warn">113ms</span>
-          </div>
-          <div style="display:flex;gap:4px;align-items:center;margin-bottom:1px">
-            <span style="font-size:var(--text-xxs);color:var(--text-faint);width:18px;flex-shrink:0">ggl</span>
-            <div class="pbar" style="flex:1;position:relative"><div class="pbf" style="width:14.2%;background:var(--green)"></div><div style="position:absolute;top:0;bottom:0;left:14.2%;width:2px;background:rgba(255,255,255,0.18);border-radius:1px"></div></div>
-            <span class="pval ok">71ms</span>
-          </div>
-          <div style="display:flex;gap:4px;align-items:center;margin-bottom:1px">
-            <span style="font-size:var(--text-xxs);color:var(--text-faint);width:18px;flex-shrink:0">ya</span>
-            <div class="pbar" style="flex:1;position:relative"><div class="pbf" style="width:16.8%;background:var(--green)"></div><div style="position:absolute;top:0;bottom:0;left:16.8%;width:2px;background:rgba(255,255,255,0.18);border-radius:1px"></div></div>
-            <span class="pval ok">84ms</span>
-          </div>
-        </div>
-
-        <!-- MANUAL-SELECT -->
-        <div style="margin-bottom:3px">
-          <div style="font-size:var(--text-xs);color:var(--text-muted);margin-bottom:1px">MANUAL-SELECT</div>
-          <div style="display:flex;gap:4px;align-items:center;margin-bottom:1px">
-            <span style="font-size:var(--text-xxs);color:var(--text-faint);width:18px;flex-shrink:0">cf</span>
-            <div class="pbar" style="flex:1;position:relative"><div class="pbf" style="width:17.6%;background:var(--green)"></div><div style="position:absolute;top:0;bottom:0;left:17.6%;width:2px;background:rgba(255,255,255,0.18);border-radius:1px"></div></div>
-            <span class="pval ok">88ms</span>
-          </div>
-          <div style="display:flex;gap:4px;align-items:center;margin-bottom:1px">
-            <span style="font-size:var(--text-xxs);color:var(--text-faint);width:18px;flex-shrink:0">ggl</span>
-            <div class="pbar" style="flex:1;position:relative"><div class="pbf" style="width:17.6%;background:var(--green)"></div><div style="position:absolute;top:0;bottom:0;left:17.6%;width:2px;background:rgba(255,255,255,0.18);border-radius:1px"></div></div>
-            <span class="pval ok">88ms</span>
-          </div>
-          <div style="display:flex;gap:4px;align-items:center;margin-bottom:1px">
-            <span style="font-size:var(--text-xxs);color:var(--text-faint);width:18px;flex-shrink:0">ya</span>
-            <div class="pbar" style="flex:1;position:relative"><div class="pbf" style="width:27.4%;background:var(--yellow)"></div><div style="position:absolute;top:0;bottom:0;left:27.4%;width:2px;background:rgba(255,255,255,0.18);border-radius:1px"></div></div>
-            <span class="pval warn">137ms</span>
-          </div>
-        </div>
-
-        <!-- PAYPAL-POOL -->
-        <div style="margin-bottom:3px">
-          <div style="font-size:var(--text-xs);color:var(--text-muted);margin-bottom:1px">PAYPAL-POOL</div>
-          <div style="display:flex;gap:4px;align-items:center;margin-bottom:1px">
-            <span style="font-size:var(--text-xxs);color:var(--text-faint);width:18px;flex-shrink:0">cf</span>
-            <div class="pbar" style="flex:1;position:relative"><div class="pbf" style="width:37%;background:var(--yellow)"></div><div style="position:absolute;top:0;bottom:0;left:37%;width:2px;background:rgba(255,255,255,0.18);border-radius:1px"></div></div>
-            <span class="pval warn">185ms</span>
-          </div>
-          <div style="display:flex;gap:4px;align-items:center;margin-bottom:1px">
-            <span style="font-size:var(--text-xxs);color:var(--text-faint);width:18px;flex-shrink:0">ggl</span>
-            <div class="pbar" style="flex:1;position:relative"><div class="pbf" style="width:33.2%;background:var(--yellow)"></div><div style="position:absolute;top:0;bottom:0;left:33.2%;width:2px;background:rgba(255,255,255,0.18);border-radius:1px"></div></div>
-            <span class="pval warn">166ms</span>
-          </div>
-          <div style="display:flex;gap:4px;align-items:center;margin-bottom:1px">
-            <span style="font-size:var(--text-xxs);color:var(--text-faint);width:18px;flex-shrink:0">ya</span>
-            <div class="pbar" style="flex:1;position:relative"><div class="pbf" style="width:48.2%;background:var(--red)"></div><div style="position:absolute;top:0;bottom:0;left:48.2%;width:2px;background:rgba(255,255,255,0.18);border-radius:1px"></div></div>
-            <span class="pval err">241ms</span>
-          </div>
+      <div class="ptitle">LATENCY
+        <div class="ptitle-r">
+          <button class="svc-action" title="Refresh latency" id="lat-refresh-btn" onclick="refresh_ping(this)">&#8635;</button>
+          <button class="svc-action" title="Configure latency pools" onclick="showLatencySettings()">&#9965;</button>
         </div>
       </div>
+      <div class="si" id="ping-p"></div>
     </div>
 
     <!-- R2 C3 - WAN -->
     <div class="panel cell-wan">
-      <div class="ptitle">WAN</div>
-      <div class="si">
-        <div class="ds"><span class="dl">WAN IP</span><span class="dv ok">203.0.113.42</span></div>
-        <div class="ds"><span class="dl">gateway</span><span class="dv">203.0.113.1</span></div>
-        <div class="ds"><span class="dl">proto</span><span class="dv">pppoe</span></div>
-        <div class="ds"><span class="dl">WAN uptime</span><span class="dv" style="color:var(--cyan)">01:19:40</span></div>
-        <div class="ds"><span class="dl">DNS (ISP)</span><span class="dv" style="color:var(--text-faint)">8.8.8.8, 1.1.1.1</span></div>
+      <div class="ptitle">WAN
+        <div class="ptitle-r">
+          <button class="svc-action" id="wan-log-btn" title="WAN logs" onclick="toggle_wan_logs(this)">&#9776;</button>
+        </div>
       </div>
+      <div class="si" id="wan-p"></div>
     </div>
 
     <!-- R3 C1 - CLIENTS -->
     <div class="panel cell-clients">
       <div class="ptitle">
-        <span>CLIENTS <span class="badge b-ok">6</span></span>
-      </div>
-      <div class="si">
-        <div class="client-row">
-          <i class="cicon eth" title="Wired PC on eth2">[PC]</i>
-          <span class="cname" title="Wired PC">WORKSTATION</span>
-          <span class="cip">192.168.1.2</span>
-        </div>
-        <div class="client-row">
-          <i class="cicon eth" title="Wired PC on eth3">[PC]</i>
-          <span class="cname" title="Wired PC">MEDIABOX</span>
-          <span class="cip">192.168.1.3</span>
-        </div>
-        <div class="client-row">
-          <i class="cicon ap" title="WiFi Access Point on eth4">[AP]</i>
-          <span class="cname" title="Access Point">TP-Link-AX73</span>
-          <span class="cip">192.168.1.4</span>
-        </div>
-        <div class="client-row">
-          <i class="cicon eth" title="TV on eth5">[TV]</i>
-          <span class="cname" title="TV">SonyBravia</span>
-          <span class="cip">192.168.1.5</span>
-        </div>
-        <div class="client-row">
-          <i class="cicon w5" title="WiFi client">[WF]</i>
-          <span class="cname" title="WiFi">iPhone-15-Alex</span>
-          <span class="cip">192.168.1.156</span>
-        </div>
-        <div class="client-row">
-          <i class="cicon w5" title="WiFi client">[WF]</i>
-          <span class="cname" title="WiFi">Pixel-9-Pro-Kate</span>
-          <span class="cip">192.168.1.196</span>
+        <span>CLIENTS <span class="badge b-ok" id="cl-bdg">6</span></span>
+        <div class="ptitle-r">
+          <label style="display:flex;align-items:center;gap:4px;font-size:var(--text-xxs);color:var(--text-faint);font-weight:400;letter-spacing:0;text-transform:none;cursor:pointer;" title="Show Docker containers">
+            <input type="checkbox" id="docker-filter-cb" onchange="toggleDockerFilter()" style="accent-color:var(--cyan);margin:0;width:11px;height:11px;cursor:pointer;flex-shrink:0;">
+            docker
+          </label>
         </div>
       </div>
+      <div class="si" id="clients-p"></div>
     </div>
 
     <!-- R3 C2 - MIHOMO -->
     <div class="panel cell-mihomo">
       <div class="ptitle">
-        <span>MIHOMO PROXY <span class="badge b-cyan">RULE</span></span>
-        <a class="ext" href="#" onclick="return false" title="Open Metacubexd">&#8599;</a>
+        <span>MIHOMO PROXY <span class="badge b-cyan" id="mi-mode">RULE</span></span>
+        <a class="ext" id="mihomo-ext-link" href="#" onclick="return false;" title="Open Metacubexd (demo)">&#8599;</a>
       </div>
-      <div class="si">
-        <div class="vgrp">
-          <div class="vgh"><span class="vgname">AUTO-FOREIGN-POOL</span><span class="vgtype" style="color:var(--cyan)">url-test</span></div>
-          <div class="vgactive" title="NordVPN_Finland">&#9654; NordVPN_Finland</div>
-          <div class="vgstats"><span class="vst-ok">&#10003; 53</span><span class="vst-err">&#10007; 1</span><span>/ 54</span></div>
-        </div>
-        <div class="vgrp">
-          <div class="vgh"><span class="vgname">CASCADE-AI</span><span class="vgtype" style="color:var(--cyan)">url-test</span></div>
-          <div class="vgactive" title="Cloudflare-WARP">&#9654; Cloudflare-WARP</div>
-          <div class="vgstats"><span class="vst-ok">&#10003; 1</span><span class="vst-err">&#10007; 0</span><span>/ 1</span></div>
-        </div>
-        <div class="vgrp">
-          <div class="vgh"><span class="vgname">MANUAL-SELECT</span><span class="vgtype" style="color:var(--purple)">select</span></div>
-          <div class="vgactive" title="NordVPN_Sweden">&#9654; NordVPN_Sweden</div>
-          <div class="vgstats"><span class="vst-ok">&#10003; 59</span><span class="vst-err">&#10007; 2</span><span>/ 61</span></div>
-        </div>
-        <div class="vgrp">
-          <div class="vgh"><span class="vgname">PAYPAL-POOL</span><span class="vgtype" style="color:var(--yellow)">fallback</span></div>
-          <div class="vgactive" title="NordVPN_Germany">&#9654; NordVPN_Germany</div>
-          <div class="vgstats"><span class="vst-ok">&#10003; 1</span><span class="vst-err">&#10007; 1</span><span>/ 2</span></div>
-        </div>
-      </div>
+      <div class="si" id="vpn-p"></div>
     </div>
 
     <!-- R3 C3 - ADGUARD -->
     <div class="panel cell-adguard">
       <div class="ptitle">
-        <span>DNS / ADGUARD <span class="badge b-ok">UP</span></span>
-        <a class="ext" href="#" onclick="return false" title="Open AdGuard">&#8599;</a>
+        <span>DNS / ADGUARD <span class="badge b-ok" id="agh-bdg">UP</span></span>
+        <a class="ext" id="adguard-ext-link" href="#" onclick="return false;" title="Open AdGuard (demo)">&#8599;</a>
       </div>
-      <div class="si">
-        <div class="ds"><span class="dl">queries today</span><span class="dv ok">1,629</span></div>
-        <div class="ds"><span class="dl">blocked</span><span class="dv warn">92 (5.6%)</span></div>
-        <div class="ds"><span class="dl">avg latency</span><span class="dv">2.3ms</span></div>
-        <hr>
-        <div class="ds"><span class="dl">filtering</span><span class="dv ok">ON</span></div>
-        <hr>
-        <div class="ds"><span class="dl">upstream DNS</span><span class="dv" style="color:var(--text-muted);word-break:break-all">127.0.0.1:1053</span></div>
-      </div>
+      <div class="si" id="dns-p"></div>
     </div>
 
     <!-- R3 C4 - WIFI -->
@@ -665,41 +542,929 @@ hr{border:none;border-top:1px solid var(--border);margin:2px 0;}
       <div class="ptitle">
         <span>WIFI</span>
         <div class="ptitle-r">
-          <span class="badge b-ok">ONLINE</span>
-          <a class="ext" href="#" onclick="return false" title="WiFi AP admin">&#8599;</a>
+          <span class="badge b-ok" id="wifi-bdg">ONLINE</span>
+          <a class="ext" id="wifi-admin-link" href="#" onclick="return false;" title="WiFi AP admin (demo)">&#8599;</a>
         </div>
       </div>
-      <div class="si">
-        <div class="wifi-section">
-          <div class="wifi-sh">
-            <span class="wifi-sname">WiFi AP</span>
-            <span class="sstatus ok">&#8226; up</span>
-          </div>
-          <div class="wrow"><span class="wlabel">IP</span><span class="wval">192.168.1.4</span></div>
-          <div class="wrow"><span class="wlabel">mode</span><span class="wval">Access Point</span></div>
-          <div class="wrow"><span class="wlabel">admin</span>
-            <a class="wlink" href="#" onclick="return false">:80 &#8599;</a>
-          </div>
-        </div>
-      </div>
+      <div class="si" id="wifi-p"></div>
     </div>
 
   </div><!-- /grid -->
 </div><!-- /dash -->
 
+<!-- ===== FIRST-RUN / SETTINGS MODAL ===== -->
+<div class="modal-overlay hidden" id="setup-modal">
+  <div class="modal-box">
+    <div class="modal-title">&#9881; DarkBoard Setup (Demo)</div>
+    <div class="modal-sub">Demo Mode: changes apply to memory only. No real network requests will be made.</div>
+
+    <div class="modal-section">Router</div>
+    <div class="modal-field">
+      <label>Router IP / URL</label>
+      <input type="text" id="m-router" value="http://192.168.1.1" autocomplete="off">
+    </div>
+    <div class="modal-row">
+      <div class="modal-field">
+        <label>LuCI port</label>
+        <input type="number" id="m-luci-port" value="80" autocomplete="off">
+      </div>
+      <div class="modal-field">
+        <label>LuCI root password</label>
+        <input type="password" id="m-luci" placeholder="(demo: blank)" autocomplete="new-password">
+      </div>
+    </div>
+
+    <div class="modal-section">Mihomo / Metacubexd</div>
+    <div class="modal-row">
+      <div class="modal-field">
+        <label>Mihomo API port</label>
+        <input type="number" id="m-mihomo-port" value="9090" autocomplete="off">
+      </div>
+      <div class="modal-field">
+        <label>Mihomo API secret</label>
+        <input type="password" id="m-mihomo" placeholder="(demo: blank)" autocomplete="new-password">
+      </div>
+    </div>
+
+    <div class="modal-section">AdGuard Home</div>
+    <div class="modal-row">
+      <div class="modal-field">
+        <label>AdGuard port</label>
+        <input type="number" id="m-agh-port" value="3003" autocomplete="off">
+      </div>
+      <div class="modal-field">
+        <label>AdGuard username</label>
+        <input type="text" id="m-agh-user" value="admin" autocomplete="off">
+      </div>
+    </div>
+    <div class="modal-field">
+      <label>AdGuard password</label>
+      <input type="password" id="m-agh" placeholder="(demo: blank)" autocomplete="new-password">
+    </div>
+
+    <div class="modal-section">AriaNG &amp; CAKE</div>
+    <div class="modal-row">
+      <div class="modal-field">
+        <label>AriaNG port</label>
+        <input type="number" id="m-ariang-port" value="6800" autocomplete="off">
+      </div>
+      <div class="modal-field">
+        <label>cake-stats port</label>
+        <input type="number" id="m-cake-stats-port" value="11112" autocomplete="off">
+      </div>
+    </div>
+
+    <div class="modal-section">WiFi Access Point (external AP)</div>
+    <div class="modal-row">
+      <div class="modal-field">
+        <label>WiFi AP IP</label>
+        <input type="text" id="m-wifiap" value="192.168.1.4" autocomplete="off">
+      </div>
+      <div class="modal-field">
+        <label>AP port</label>
+        <input type="number" id="m-wifiap-port" value="80" autocomplete="off">
+      </div>
+    </div>
+    <div class="modal-field">
+      <label style="display:flex;align-items:center;gap:6px;">
+        <input type="checkbox" id="m-wifiap-https" style="width:auto;accent-color:var(--cyan)"> Use HTTPS for WiFi AP
+      </label>
+    </div>
+
+    <div class="modal-actions">
+      <button class="modal-btn danger" onclick="clear_creds()" title="Reset demo values">Reset</button>
+      <span style="flex:1"></span>
+      <button class="modal-btn secondary" onclick="modal_skip()">Skip</button>
+      <button class="modal-btn primary" onclick="modal_save()">Save &amp; Start</button>
+    </div>
+  </div>
+</div>
+
+<!-- LATENCY SETTINGS MODAL -->
+<div class="modal-overlay hidden" id="latency-modal">
+  <div class="modal-box" style="min-width:300px;max-width:420px;">
+    <div class="modal-title">&#9965; Latency Pool Filter</div>
+    <div class="modal-sub">Select which proxy pools to display in the latency widget.</div>
+    <div id="latency-pool-list" style="display:flex;flex-direction:column;gap:6px;margin-bottom:16px;"></div>
+    <div class="modal-actions">
+      <button class="modal-btn secondary" onclick="latencyModalSelectAll()">All</button>
+      <button class="modal-btn secondary" onclick="latencyModalSelectNone()">None</button>
+      <span style="flex:1"></span>
+      <button class="modal-btn secondary" onclick="closeLatencyModal()">Cancel</button>
+      <button class="modal-btn primary" onclick="saveLatencySettings()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- OTHER SERVICES MODAL -->
+<div class="modal-overlay hidden" id="other-services-modal">
+  <div class="modal-box" style="max-width: 500px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px;">
+      <div class="modal-title" style="margin:0;">&#9881; Installed Services (Demo)</div>
+      <button class="svc-action" style="color:var(--red); font-size: 16px; padding: 4px;" onclick="close_other_services()" title="Close">&#10005;</button>
+    </div>
+    <div class="modal-sub">Click a tile to open the service control panel.</div>
+    
+    <div class="services-grid" id="other-services-grid"></div>
+  </div>
+</div>
+
 <div class="footer"><a href="https://github.com/Anilexis/openwrt-darkboard" target="_blank" rel="noopener noreferrer">DarkBoard</a></div>
 
 <script>
-// Clock ticker only
-function tickClock() {
-  var n = new Date;
-  var h = String(n.getHours()).padStart(2, '0');
-  var m = String(n.getMinutes()).padStart(2, '0');
-  var s = String(n.getSeconds()).padStart(2, '0');
-  document.getElementById('tb-clk').textContent = h + ':' + m + ':' + s;
+// ============================================================
+// ZERO-NETWORK GUARD
+// ============================================================
+window.fetch = () => Promise.reject(new Error('Network requests are strictly disabled in Demo mode.'));
+window.XMLHttpRequest = function() {
+  this.open = () => {};
+  this.send = () => {};
+};
+
+// ============================================================
+// UTILITIES
+// ============================================================
+const $ = id => document.getElementById(id);
+const fmt_b = b => {
+  if (b == null || isNaN(b) || !isFinite(b)) return '--';
+  const a = Math.abs(b);
+  if (a >= 2**30) return (b / (2**30)).toFixed(2) + 'G/s';
+  if (a >= 2**20) return (b / (2**20)).toFixed(1) + 'M/s';
+  if (a >= 2**10) return (b / (2**10)).toFixed(0) + 'K/s';
+  return Math.round(b) + 'B/s';
+};
+const fmt_sz = b => {
+  if (!b || b <= 0) return '0';
+  if (b >= 2**30) return (b / (2**30)).toFixed(1) + 'G';
+  if (b >= 2**20) return (b / (2**20)).toFixed(0) + 'M';
+  return (b / (2**10)).toFixed(0) + 'K';
+};
+const lat_color = ms => ms == null ? 'var(--red)' : ms <= 50 ? 'var(--cyan)' : ms <= 100 ? 'var(--green)' : ms <= 200 ? 'var(--yellow)' : 'var(--red)';
+const lat_cls = ms => ms == null ? 'err' : ms <= 50 ? 'cyan' : ms <= 100 ? 'ok' : ms <= 200 ? 'warn' : 'err';
+
+// ============================================================
+// MOCK STATE & DATA
+// ============================================================
+const DEMO_STATE = {
+  uptime: 4797,     // 01:19:57
+  wanUptime: 4780,  // 01:19:40
+  temp: 52,
+  wanRx: 42350,
+  wanTx: 73800,
+  conns: 719,
+  cores: [
+    { pct: 5, max: 12 },
+    { pct: 2, max: 14 },
+    { pct: 7, max: 14 },
+    { pct: 5, max: 18 }
+  ],
+  mem: {
+    total: 7718,
+    used: 440,
+    buf: 18,
+    cch: 122,
+    free: 7270,
+    avail: 7304,
+    swap: 0,
+    maxRam: 5.7,
+    maxBuf: 0.2,
+    maxCch: 1.6
+  },
+  disks: [
+    { mp: '/', dev: 'root', used: 285 * 1024 * 1024, size: 246.86 * 1024 * 1024 * 1024, isContainer: false },
+    { mp: '/boot', dev: 'nvme0n1p1', used: 6 * 1024 * 1024, size: 17 * 1024 * 1024, isContainer: false },
+    { mp: '/overlay', dev: 'nvme0n1p2', used: 142 * 1024 * 1024, size: 246.86 * 1024 * 1024 * 1024, isContainer: false },
+    { mp: '/mnt/data', dev: 'nvme0n1p3', used: 42.1 * 1024 * 1024 * 1024, size: 240.0 * 1024 * 1024 * 1024, isContainer: false },
+    { mp: '/mnt/docker/overlay2/c8942a', dev: 'overlay', used: 12.4 * 1024 * 1024 * 1024, size: 50.0 * 1024 * 1024 * 1024, isContainer: true }
+  ],
+  services: [
+    { name: 'uhttpd', label: 'LuCI (uhttpd)', type: 'daemon', status: 'UP', up: true },
+    { name: 'network', label: 'Network', type: 'daemon', status: 'UP', up: true },
+    { name: 'dnsmasq', label: 'dnsmasq', type: 'daemon', status: 'UP', up: true },
+    { name: 'dropbear', label: 'SSH', type: 'daemon', status: 'UP', up: true },
+    { name: 'rpcd', label: 'rpcd', type: 'daemon', status: 'UP', up: true },
+    { name: 'sysntpd', label: 'ntpd', type: 'daemon', status: 'UP', up: true },
+    { name: 'cron', label: 'crond', type: 'daemon', status: 'UP', up: true },
+    { name: 'mwan3', label: 'mwan3', type: 'daemon', status: 'UP', up: true },
+    { name: 'ttyd', label: 'Web Terminal', type: 'daemon', status: 'UP', up: true },
+    { name: 'nikki', label: 'nikki (mihomo)', type: 'daemon', status: 'UP', up: true },
+    { name: 'adguardhome', label: 'AdGuard Home', type: 'daemon', status: 'UP', up: true },
+    { name: 'collectd', label: 'collectd', type: 'daemon', status: 'UP', up: true },
+    { name: 'opentracker', label: 'opentracker', type: 'daemon', status: 'UP', up: true },
+    { name: 'firewall', label: 'firewall', type: 'oneshot', status: 'LOADED' },
+    { name: 'sqm', label: 'SQM/CAKE', type: 'oneshot', status: 'LOADED' }
+  ],
+  ifaces: [
+    { name: 'eth0', up: true, speed: '1G', role: 'wan', rx: 42350, tx: 73800, totRx: 642 * 1024 * 1024, totTx: 83 * 1024 * 1024, err: 0 },
+    { name: 'eth1', up: false, speed: '', role: 'lan', rx: 0, tx: 0, totRx: 0, totTx: 0, err: 0 },
+    { name: 'eth2', up: true, speed: '2.5G', role: 'lan', rx: 421000, tx: 1156000, totRx: 54 * 1024 * 1024, totTx: 513 * 1024 * 1024, err: 0 },
+    { name: 'eth3', up: false, speed: '', role: 'lan', rx: 0, tx: 0, totRx: 0, totTx: 0, err: 0 },
+    { name: 'eth4', up: true, speed: '2.5G', role: 'lan', rx: 4872, tx: 73000, totRx: 16 * 1024 * 1024, totTx: 32 * 1024 * 1024, err: 0 },
+    { name: 'eth5', up: true, speed: '100M', role: 'lan', rx: 408, tx: 72000, totRx: 3 * 1024 * 1024, totTx: 31 * 1024 * 1024, err: 0 }
+  ],
+  latency: [
+    { name: 'DIRECT', label: 'DIRECT (ISP)', cf: 64, ggl: 51, ya: 42 },
+    { name: 'AUTO-FOREIGN-POOL', label: 'AUTO-FOREIGN-POOL', cf: 60, ggl: 88, ya: 70 },
+    { name: 'CASCADE-AI', label: 'CASCADE-AI', cf: 113, ggl: 71, ya: 84 },
+    { name: 'MANUAL-SELECT', label: 'MANUAL-SELECT', cf: 88, ggl: 88, ya: 137 },
+    { name: 'PAYPAL-POOL', label: 'PAYPAL-POOL', cf: 185, ggl: 166, ya: 241 }
+  ],
+  clients: [
+    { ip: '192.168.1.2', name: 'WORKSTATION', mac: '70:85:c2:51:3a:89', type: 'pc', iface: 'eth2', v6: '2a00:1370:812d:1100::14', conns: 42, rx: 421000, tx: 1156000, totRx: 4.2 * 1024**3, totTx: 890 * 1024**2 },
+    { ip: '192.168.1.3', name: 'MEDIABOX', mac: 'b8:27:eb:49:1a:2b', type: 'pc', iface: 'eth3', v6: '2a00:1370:812d:1100::15', conns: 12, rx: 3200, tx: 4100, totRx: 1.1 * 1024**3, totTx: 210 * 1024**2 },
+    { ip: '192.168.1.4', name: 'TP-Link-AX73', mac: '5c:e9:31:82:70:1a', type: 'ap', iface: 'eth4', conns: 64, rx: 4872, tx: 73000, totRx: 16 * 1024**2, totTx: 32 * 1024**2 },
+    { ip: '192.168.1.5', name: 'SonyBravia', mac: 'f4:42:8f:20:9b:33', type: 'tv', iface: 'eth5', conns: 8, rx: 408, tx: 72000, totRx: 3 * 1024**2, totTx: 31 * 1024**2 },
+    { ip: '192.168.1.156', name: 'iPhone-15-Alex', mac: '36:12:4a:bc:88:01', type: 'wifi', iface: '', conns: 26, rx: 12000, tx: 8500, totRx: 240 * 1024**2, totTx: 85 * 1024**2 },
+    { ip: '192.168.1.196', name: 'Pixel-9-Pro-Kate', mac: '42:98:bb:c1:44:90', type: 'wifi', iface: '', conns: 18, rx: 8900, tx: 4200, totRx: 190 * 1024**2, totTx: 56 * 1024**2 },
+    { ip: '172.17.0.2', name: 'AdGuard-Container', mac: '02:42:ac:11:00:02', type: 'pc', iface: 'docker0', conns: 15, rx: 1500, tx: 1200, totRx: 45 * 1024**2, totTx: 30 * 1024**2, isDocker: true }
+  ],
+  mihomo: [
+    { name: 'AUTO-FOREIGN-POOL', type: 'URLTest', active: 'NordVPN_Finland', ok: 53, fail: 1, total: 54 },
+    { name: 'CASCADE-AI', type: 'URLTest', active: 'Cloudflare-WARP', ok: 1, fail: 0, total: 1 },
+    { name: 'MANUAL-SELECT', type: 'Selector', active: 'NordVPN_Sweden', ok: 59, fail: 2, total: 61 },
+    { name: 'PAYPAL-POOL', type: 'Fallback', active: 'NordVPN_Germany', ok: 1, fail: 1, total: 2 }
+  ],
+  adguard: {
+    queries: 1629,
+    blocked: 92,
+    pct: '5.6',
+    latency: '2.3ms',
+    filtering: true,
+    topBlocked: [
+      { name: 'telemetry.microsoft.com', count: 41 },
+      { name: 'app-measurement.com', count: 28 },
+      { name: 'v10.events.data.microsoft.com', count: 15 }
+    ],
+    upstreams: ['127.0.0.1:1053', 'https://dns.quad9.net/dns-query', 'tls://dns.adguard-dns.com', 'https://cloudflare-dns.com/dns-query']
+  },
+  wifiAp: {
+    ip: '192.168.1.4',
+    up: true,
+    uptime: '14d 6h 32m',
+    sys: 'load 0.12 0.08 0.05 mem 28%',
+    temp: 'cpu 54&deg;C w0 48&deg;C w1 51&deg;C',
+    errors: '2.4G ok 5G ok',
+    clients: [
+      { ipSuffix: '.156', name: 'iPhone-15-Alex', band: '5G', lvl: 3, mac: '36:12:4a:bc:88:01' },
+      { ipSuffix: '.196', name: 'Pixel-9-Pro-Kate', band: '5G', lvl: 3, mac: '42:98:bb:c1:44:90' },
+      { ipSuffix: '.182', name: 'iPad-Air', band: '5G', lvl: 2, mac: '84:d4:7e:22:90:11' },
+      { ipSuffix: '.204', name: 'Smart-Plug', band: '2.4G', lvl: 1, mac: 'cc:50:e3:11:55:aa' }
+    ]
+  }
+};
+
+let ifaceEditMode = false;
+let wanLogsActive = false;
+let currentLogSvc = null;
+let selectedClient = null;
+let storageFilterCompact = false;
+let showDockerClients = false;
+let latencyFilter = {};
+
+// ============================================================
+// FORMAT UP TIME HELPER
+// ============================================================
+function formatUptime(seconds) {
+  const d = Math.floor(seconds / 86400);
+  const h = Math.floor((seconds % 86400) / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  return (d ? d + 'd ' : '') + [h, m, s].map(x => String(x).padStart(2, '0')).join(':');
 }
-setInterval(tickClock, 1000);
+
+// ============================================================
+// RENDER CORES & CPU
+// ============================================================
+function init_cores() {
+  const grid = $('cpu-cores');
+  if (!grid) return;
+  grid.style.gridTemplateColumns = `repeat(4, 1fr)`;
+  let html = '';
+  for (let i = 0; i < 4; i++) {
+    const c = DEMO_STATE.cores[i];
+    html += `<div class="core">
+      <div class="corebar">
+        <div class="corefill" id="cc${i}" style="height:${c.pct}%; background:var(--green)"></div>
+        <div class="corebar-max" id="cm${i}" style="bottom:${c.max}%" title="max ${c.max}%"></div>
+      </div>
+      <div class="corelbel">C${i}</div>
+      <div class="coreval" id="cv${i}" style="color:var(--green)">${c.pct}%</div>
+      <div class="core-maxval" id="cmv${i}">max ${c.max}%</div>
+    </div>`;
+  }
+  grid.innerHTML = html;
+}
+
+function update_cpu_ui() {
+  let sum = 0;
+  for (let i = 0; i < 4; i++) {
+    const c = DEMO_STATE.cores[i];
+    sum += c.pct;
+    const col = c.pct > 80 ? 'var(--red)' : c.pct > 50 ? 'var(--yellow)' : 'var(--green)';
+    const f = $('cc' + i), v = $('cv' + i), mx = $('cm' + i), mv = $('cmv' + i);
+    if (f) { f.style.height = c.pct + '%'; f.style.background = col; }
+    if (v) { v.textContent = c.pct + '%'; v.style.color = col; }
+    if (mx) { mx.style.bottom = c.max + '%'; mx.title = 'max ' + c.max + '%'; }
+    if (mv) mv.textContent = 'max ' + c.max + '%';
+  }
+  const avg = Math.round(sum / 4);
+  const bdg = $('cpu-bdg');
+  if (bdg) {
+    bdg.textContent = avg + '%';
+    bdg.className = 'badge ' + (avg > 80 ? 'b-err' : avg > 50 ? 'b-warn' : 'b-ok');
+  }
+  $('ct-act').textContent = DEMO_STATE.conns.toLocaleString();
+  $('ct-bar').style.width = ((DEMO_STATE.conns / 262144) * 100).toFixed(1) + '%';
+  $('ct-bdg').textContent = 'ct: ' + DEMO_STATE.conns;
+}
+
+// ============================================================
+// STORAGE
+// ============================================================
+function toggleStorageFilter() {
+  storageFilterCompact = $('storage-filter-cb').checked;
+  render_storage();
+}
+
+function render_storage() {
+  const el = $('disk-p');
+  if (!el) return;
+  const filtered = storageFilterCompact
+    ? DEMO_STATE.disks.filter(d => !d.isContainer && d.mp !== '/overlay')
+    : DEMO_STATE.disks;
+  let html = '';
+  for (const m of filtered) {
+    const pct = Math.round((m.used / m.size) * 100);
+    const cls = pct > 85 ? 'err' : pct > 65 ? 'warn' : '';
+    html += `<div class="bw" style="margin-bottom:3px">
+      <div class="blr"><span>${m.mp}</span><span style="color:var(--text-faint)">${m.dev}</span><span class="bv">${fmt_sz(m.used)} / ${fmt_sz(m.size)}</span></div>
+      <div class="bar"><div class="bf ${cls}" style="width:${pct}%"></div></div>
+    </div>`;
+  }
+  el.innerHTML = html;
+}
+
+// ============================================================
+// SERVICES & LOGS
+// ============================================================
+function render_services() {
+  if (currentLogSvc) {
+    render_logs(currentLogSvc);
+    return;
+  }
+  const el = $('svc-p');
+  if (!el) return;
+  let html = '';
+  for (const s of DEMO_STATE.services) {
+    if (s.type === 'daemon') {
+      html += `<div class="svc">
+        <button class="svc-action" title="Restart ${s.label}" onclick="svc_restart('${s.name}',this)">&#8635;</button>
+        <button class="svc-action" title="Logs: ${s.label}" onclick="show_logs('${s.name}')">&#9776;</button>
+        <div class="dot ${s.up ? 'ok' : 'err'}"></div>
+        <span class="sname">${s.label}</span>
+        <span class="sstatus ${s.up ? 'ok' : 'err'}">${s.status}</span>
+      </div>`;
+    } else {
+      html += `<div class="svc">
+        <button class="svc-action" title="Reload ${s.label}" onclick="svc_restart('${s.name}',this)">&#8635;</button>
+        <button class="svc-action" title="Logs: ${s.label}" onclick="show_logs('${s.name}')">&#9776;</button>
+        <div class="dot warn"></div>
+        <span class="sname">${s.label}</span>
+        <span class="sstatus" style="color:var(--yellow)">${s.status}</span>
+      </div>`;
+    }
+  }
+  el.innerHTML = html;
+}
+
+function svc_restart(name, btn) {
+  btn.classList.add('spinning');
+  setTimeout(() => {
+    btn.classList.remove('spinning');
+    btn.style.color = 'var(--green)';
+    setTimeout(() => { btn.style.color = ''; }, 1200);
+  }, 1000);
+}
+
+function show_logs(name) {
+  currentLogSvc = name;
+  render_logs(name);
+}
+
+function close_logs() {
+  currentLogSvc = null;
+  render_services();
+}
+
+function render_logs(name) {
+  const logs = [
+    `daemon.info ${name}[1042]: started successfully with pid 1042`,
+    `daemon.info ${name}[1042]: loading configuration file /etc/${name}.conf`,
+    `daemon.notice ${name}[1042]: service ready and listening for events`,
+    `daemon.info ${name}[1042]: worker thread pool initialized (4 workers)`,
+    `daemon.info ${name}[1042]: health check passed: all subsystems normal`,
+    `daemon.info ${name}[1042]: serving client requests (0 errors reported)`
+  ];
+  $('svc-p').innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;padding-bottom:2px;border-bottom:1px solid var(--border-2)">
+      <span style="font-size:var(--text-xs);color:var(--cyan)">&gt; ${name}</span>
+      <button onclick="close_logs()" class="svc-action" style="color:var(--red)" title="Close logs">&#10005;</button>
+    </div>
+    <div>${logs.map(l => `<div class="log-line">${l}</div>`).join('')}</div>
+  `;
+}
+
+function reboot_router(btn) {
+  if (!confirm('Reboot the router now?\n(Demo mode: this will simulate a safe router reboot.)')) return;
+  btn.classList.add('spinning');
+  btn.style.color = 'var(--yellow)';
+  setTimeout(() => {
+    btn.classList.remove('spinning');
+    btn.style.color = 'var(--green)';
+    setTimeout(() => { btn.style.color = ''; }, 1500);
+  }, 2000);
+}
+
+// ============================================================
+// INTERFACES & ROLES
+// ============================================================
+function toggleIfaceEdit() {
+  ifaceEditMode = !ifaceEditMode;
+  $('iface-edit-btn').style.color = ifaceEditMode ? 'var(--cyan)' : '';
+  render_interfaces();
+}
+
+function setIfaceRole(name, role) {
+  const iface = DEMO_STATE.ifaces.find(i => i.name === name);
+  if (iface) iface.role = role;
+  render_interfaces();
+}
+
+function getTrafficSfx(rate) {
+  if (rate >= 25e6) return 'hi';
+  if (rate >= 5e6) return 'mid';
+  if (rate >= 1e6) return 'lo';
+  return 'dim';
+}
+
+function render_interfaces() {
+  const el = $('net-p');
+  if (!el) return;
+  let html = '';
+  for (const i of DEMO_STATE.ifaces) {
+    if (ifaceEditMode) {
+      const isLan = i.role === 'lan';
+      html += `<div class="iface">
+        <div class="ifr1">
+          <span class="ifname ${i.up ? 'up' : 'down'}">${i.name}</span>
+          <div class="if-role-box" style="margin-left:auto">
+            <span class="role-btn ${!isLan ? 'active' : ''}" onclick="setIfaceRole('${i.name}','wan')">WAN</span>
+            <span class="role-btn ${isLan ? 'active' : ''}" onclick="setIfaceRole('${i.name}','lan')">LAN</span>
+          </div>
+        </div>
+        <div class="ifr2" style="color:var(--text-faint); font-size:var(--text-xxs)">Configure interface behavior</div>
+      </div>`;
+    } else {
+      const isLan = i.role === 'lan';
+      const rxStr = fmt_b(i.rx);
+      const txStr = fmt_b(i.tx);
+      const rxSfx = getTrafficSfx(i.rx);
+      const txSfx = getTrafficSfx(i.tx);
+
+      let dArrow = '↓' + rxStr, uArrow = '↑' + txStr;
+      let dClass = `rx rx-${rxSfx}`, uClass = `tx tx-${txSfx}`;
+      let volStr = fmt_sz(i.totRx) + '/' + fmt_sz(i.totTx);
+
+      if (isLan) {
+        dArrow = '↓' + txStr; dClass = `rx rx-${txSfx}`;
+        uArrow = '↑' + rxStr; uClass = `tx tx-${rxSfx}`;
+        volStr = fmt_sz(i.totTx) + '/' + fmt_sz(i.totRx);
+      }
+
+      html += `<div class="iface" id="if-${i.name}">
+        <div class="ifr1">
+          <span class="ifname ${i.up ? 'up' : 'down'}">${i.name}</span>
+          ${i.speed ? `<span class="ifspd">${i.speed}</span>` : ''}
+          <span class="iflink">${i.up ? 'UP' : 'DOWN'}</span>
+        </div>
+        <div class="ifr2">
+          <span class="${dClass}">${dArrow}</span>
+          <span class="${uClass}">${uArrow}</span>
+          <span style="margin-left:auto;color:var(--text-faint)">${volStr}</span>
+        </div>
+      </div>`;
+    }
+  }
+  el.innerHTML = html;
+}
+
+// ============================================================
+// LATENCY & FILTER MODAL
+// ============================================================
+function render_ping() {
+  const el = $('ping-p');
+  if (!el) return;
+  const now = new Date();
+  const timeStr = [now.getHours(), now.getMinutes(), now.getSeconds()].map(x => String(x).padStart(2, '0')).join(':');
+
+  let html = `<div class="ds" style="margin-bottom:3px"><span class="dl">last check</span><span class="dv" style="color:var(--text-faint)">${timeStr}</span></div>`;
+
+  const activePools = DEMO_STATE.latency.filter(g => latencyFilter[g.name] !== false);
+
+  for (const g of activePools) {
+    html += `<div style="margin-bottom:3px">
+      <div style="font-size:var(--text-xs);color:var(--text-muted);margin-bottom:1px">${g.label}</div>`;
+    
+    for (const t of ['cf', 'ggl', 'ya']) {
+      const ms = g[t];
+      const bp = ms ? Math.min(100, ms / 500 * 100) : 100;
+      const bc = lat_color(ms);
+      const cls = lat_cls(ms);
+
+      html += `<div style="display:flex;gap:4px;align-items:center;margin-bottom:1px">
+        <span style="font-size:var(--text-xxs);color:var(--text-faint);width:18px;flex-shrink:0">${t}</span>
+        <div class="pbar" style="flex:1;position:relative">
+          <div class="pbf" style="width:${bp.toFixed(1)}%;background:${bc}"></div>
+          <div style="position:absolute;top:0;bottom:0;left:${bp.toFixed(1)}%;width:2px;background:rgba(255,255,255,0.18);border-radius:1px"></div>
+        </div>
+        <span class="pval ${cls}">${ms}ms</span>
+      </div>`;
+    }
+    html += `</div>`;
+  }
+  el.innerHTML = html;
+}
+
+function refresh_ping(btn) {
+  btn.classList.add('spinning');
+  setTimeout(() => {
+    // Slightly randomize latency values within normal variance
+    DEMO_STATE.latency.forEach(g => {
+      g.cf = Math.max(20, Math.min(250, Math.round(g.cf + (Math.random() * 8 - 4))));
+      g.ggl = Math.max(20, Math.min(250, Math.round(g.ggl + (Math.random() * 8 - 4))));
+      g.ya = Math.max(20, Math.min(250, Math.round(g.ya + (Math.random() * 8 - 4))));
+    });
+    btn.classList.remove('spinning');
+    render_ping();
+  }, 600);
+}
+
+function showLatencySettings() {
+  const list = $('latency-pool-list');
+  if (!list) return;
+  list.innerHTML = DEMO_STATE.latency.map(g => {
+    const checked = latencyFilter[g.name] !== false;
+    return `<label class="lat-check-row">
+      <input type="checkbox" id="latck-${g.name.replace(/[^a-z0-9]/gi,'_')}" ${checked ? 'checked' : ''}>
+      <span>${g.label}</span>
+    </label>`;
+  }).join('');
+  $('latency-modal').classList.remove('hidden');
+}
+
+function closeLatencyModal() {
+  $('latency-modal').classList.add('hidden');
+}
+
+function latencyModalSelectAll() {
+  document.querySelectorAll('#latency-pool-list input[type=checkbox]').forEach(c => c.checked = true);
+}
+
+function latencyModalSelectNone() {
+  document.querySelectorAll('#latency-pool-list input[type=checkbox]').forEach(c => c.checked = false);
+}
+
+function saveLatencySettings() {
+  DEMO_STATE.latency.forEach(g => {
+    const el = $('latck-' + g.name.replace(/[^a-z0-9]/gi,'_'));
+    latencyFilter[g.name] = el ? el.checked : true;
+  });
+  closeLatencyModal();
+  render_ping();
+}
+
+// ============================================================
+// WAN & WAN LOGS
+// ============================================================
+function toggle_wan_logs(btn) {
+  wanLogsActive = !wanLogsActive;
+  btn.style.color = wanLogsActive ? 'var(--cyan)' : '';
+  render_wan();
+}
+
+function render_wan() {
+  const el = $('wan-p');
+  if (!el) return;
+  if (wanLogsActive) {
+    const lines = [
+      'daemon.notice netifd: Network device \'eth0\' link is up',
+      'daemon.notice pppd[1452]: Plugin rp-pppoe.so loaded',
+      'daemon.info pppd[1452]: PPP session is 4184',
+      'daemon.info pppd[1452]: Connected to 00:30:88:12:a4:01 via eth0',
+      'daemon.info pppd[1452]: Remote message: Authentication succeeded',
+      'daemon.notice netifd: Network device \'pppoe-wan\' link is up',
+      'daemon.notice netifd: Interface \'wan\' is now up',
+      'daemon.info pppd[1452]: local  IP address 203.0.113.42',
+      'daemon.info pppd[1452]: remote IP address 203.0.113.1',
+      'daemon.info pppd[1452]: primary   DNS address 8.8.8.8',
+      'daemon.info pppd[1452]: secondary DNS address 1.1.1.1'
+    ];
+    el.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;padding-bottom:2px;border-bottom:1px solid var(--border-2)">
+        <span style="font-size:var(--text-xs);color:var(--cyan)">Logs</span>
+        <button onclick="render_wan()" class="svc-action" title="Refresh">&#8635;</button>
+      </div>
+      <div>${lines.map(l => `<div class="log-line">${l}</div>`).join('')}</div>
+    `;
+  } else {
+    el.innerHTML = `
+      <div class="ds"><span class="dl">WAN IP</span><span class="dv ok">203.0.113.42</span></div>
+      <div class="ds"><span class="dl">gateway</span><span class="dv">203.0.113.1</span></div>
+      <div class="ds"><span class="dl">proto</span><span class="dv">pppoe</span></div>
+      <div class="ds"><span class="dl">WAN uptime</span><span class="dv cyan" id="wan-up-val">${formatUptime(DEMO_STATE.wanUptime)}</span></div>
+      <div class="ds"><span class="dl">DNS (ISP)</span><span class="dv" style="color:var(--text-faint)">8.8.8.8, 1.1.1.1</span></div>
+    `;
+  }
+}
+
+// ============================================================
+// CLIENTS & CLIENT DETAILS
+// ============================================================
+function toggleDockerFilter() {
+  showDockerClients = $('docker-filter-cb').checked;
+  render_clients();
+}
+
+function render_clients() {
+  const el = $('clients-p');
+  if (!el) return;
+  if (selectedClient) {
+    render_client_details();
+    return;
+  }
+  const filtered = showDockerClients
+    ? DEMO_STATE.clients
+    : DEMO_STATE.clients.filter(c => !c.isDocker);
+  
+  $('cl-bdg').textContent = filtered.length;
+  let html = '';
+  const symMap = { tv: '[TV]', pc: '[PC]', wifi: '[WF]', ap: '[AP]' };
+
+  for (const c of filtered) {
+    const iconClass = c.type === 'ap' ? 'ap' : c.type === 'tv' ? 'tv' : c.type === 'wifi' ? 'w5' : 'eth';
+    html += `<div class="client-row" onclick="show_client_details('${c.ip}')">
+      <i class="cicon ${iconClass}" title="${c.type}">${symMap[c.type] || '[??]'}</i>
+      <span class="cname" title="${c.mac}">${c.name}</span>
+      <span class="cip">${c.ip}</span>
+    </div>`;
+  }
+  el.innerHTML = html;
+}
+
+function show_client_details(ip) {
+  selectedClient = DEMO_STATE.clients.find(c => c.ip === ip);
+  render_client_details();
+}
+
+function close_client_details() {
+  selectedClient = null;
+  render_clients();
+}
+
+function render_client_details() {
+  const c = selectedClient;
+  if (!c) return;
+  const el = $('clients-p');
+  let h = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;padding-bottom:2px;border-bottom:1px solid var(--border-2)">
+      <span style="font-size:var(--text-xs);color:var(--cyan)">&gt; ${c.name}</span>
+      <button onclick="close_client_details()" class="svc-action" style="color:var(--red)" title="Close">&#10005;</button>
+    </div>
+    <div class="ds"><span class="dl">IP</span><span class="dv ok">${c.ip}</span></div>
+    <div class="ds"><span class="dl">MAC</span><span class="dv" style="font-family:var(--font-mono);color:var(--text-muted)">${c.mac.toUpperCase()}</span></div>
+  `;
+  if (c.v6) {
+    h += `<div class="ds"><span class="dl">IPv6</span><span class="dv" style="font-size:var(--text-xxs);color:var(--text-faint)">${c.v6}</span></div>`;
+  }
+  h += `<div class="ds"><span class="dl">type</span><span class="dv">${c.type.toUpperCase()} ${c.iface ? '(' + c.iface + ')' : ''}</span></div>`;
+  h += `<hr>`;
+  h += `<div class="ds"><span class="dl">active conns</span><span class="dv" style="color:var(--cyan)">${c.conns}</span></div>`;
+  h += `<div class="ds"><span class="dl">arp state</span><span class="dv" style="color:var(--green)">REACHABLE</span></div>`;
+  h += `<hr>`;
+  h += `<div class="ds"><span class="dl">download / upload</span><span class="dv" style="font-size:var(--text-xxs)">
+    <span style="color:var(--cyan)">&darr;${fmt_sz(c.totRx)}</span> <span style="color:var(--orange)">&uarr;${fmt_sz(c.totTx)}</span>
+  </span></div>`;
+  h += `<div class="ds"><span class="dl">speed</span><span class="dv" style="font-size:var(--text-xxs)">
+    <span style="color:var(--cyan)">&darr;${fmt_b(c.rx)}</span> <span style="color:var(--orange)">&uarr;${fmt_b(c.tx)}</span>
+  </span></div>`;
+  el.innerHTML = h;
+}
+
+// ============================================================
+// MIHOMO PROXY
+// ============================================================
+function render_mihomo() {
+  const el = $('vpn-p');
+  if (!el) return;
+  let html = '';
+  for (const g of DEMO_STATE.mihomo) {
+    const tc = g.type === 'URLTest' ? 'var(--cyan)' : g.type === 'Fallback' ? 'var(--yellow)' : 'var(--purple)';
+    const tl = g.type === 'URLTest' ? 'url-test' : g.type === 'Fallback' ? 'fallback' : 'select';
+    html += `<div class="vgrp">
+      <div class="vgh"><span class="vgname">${g.name}</span><span class="vgtype" style="color:${tc}">${tl}</span></div>
+      <div class="vgactive" title="${g.active}">&#9654; ${g.active}</div>
+      <div class="vgstats"><span class="vst-ok">&#10003; ${g.ok}</span><span class="vst-err">&#10007; ${g.fail}</span><span>/ ${g.total}</span></div>
+    </div>`;
+  }
+  el.innerHTML = html;
+}
+
+// ============================================================
+// ADGUARD HOME
+// ============================================================
+let aghExpanded = false;
+function render_adguard() {
+  const el = $('dns-p');
+  if (!el) return;
+  const a = DEMO_STATE.adguard;
+  let html = `
+    <div class="ds"><span class="dl">queries today</span><span class="dv ok">${a.queries.toLocaleString()}</span></div>
+    <div class="ds"><span class="dl">blocked</span><span class="dv warn">${a.blocked} (${a.pct}%)</span></div>
+    <div class="ds"><span class="dl">avg latency</span><span class="dv">${a.latency}</span></div>
+    <hr>
+  `;
+  for (const t of a.topBlocked) {
+    html += `<div class="ds"><span class="dl" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:70%">${t.name}</span><span class="dv warn">${t.count}</span></div>`;
+  }
+  html += `<hr><div class="ds"><span class="dl">filtering</span><span class="dv ok">ON</span></div><hr>`;
+
+  const visibleUpstreams = aghExpanded ? a.upstreams : a.upstreams.slice(0, 2);
+  visibleUpstreams.forEach((u, i) => {
+    html += `<div class="ds"><span class="dl">${i === 0 ? 'upstream DNS' : ''}</span><span class="dv" style="color:var(--text-muted);word-break:break-all">${u}</span></div>`;
+  });
+  if (!aghExpanded && a.upstreams.length > 2) {
+    html += `<div class="ds"><span class="dl"></span><span class="dv" style="color:var(--text-muted);cursor:pointer;text-decoration:underline" onclick="aghExpanded=true;render_adguard();">+${a.upstreams.length - 2} more</span></div>`;
+  } else if (aghExpanded && a.upstreams.length > 2) {
+    html += `<div class="ds"><span class="dl"></span><span class="dv" style="color:var(--text-faint);cursor:pointer;text-decoration:underline" onclick="aghExpanded=false;render_adguard();">hide</span></div>`;
+  }
+
+  el.innerHTML = html;
+}
+
+// ============================================================
+// WIFI AP
+// ============================================================
+function render_wifi() {
+  const el = $('wifi-p');
+  if (!el) return;
+  const w = DEMO_STATE.wifiAp;
+  let html = `
+    <div class="wifi-section">
+      <div class="wifi-sh">
+        <span class="wifi-sname">External AP</span>
+        <span class="sstatus ok">&bull; up</span>
+      </div>
+      <div class="wrow"><span class="wlabel">IP</span><span class="wval">${w.ip}</span></div>
+      <div class="wrow"><span class="wlabel">admin</span><a class="wlink" href="#" onclick="return false;">:80 &#8599;</a></div>
+      <div class="wrow"><span class="wlabel">uptime</span><span class="wval">${w.uptime}</span></div>
+      <div class="wrow"><span class="wlabel">sys</span><span class="wval" style="font-size:var(--text-xxs)">${w.sys}</span></div>
+      <div class="wrow"><span class="wlabel">temp</span><span class="wval" style="display:flex;gap:8px;font-size:var(--text-xxs)">${w.temp}</span></div>
+      <div class="wrow"><span class="wlabel">errors</span><span class="wval" style="display:flex;gap:12px;font-size:var(--text-xxs)">${w.errors}</span></div>
+    </div>
+    <div class="wifi-section">
+      <div class="wifi-sh"><span class="wifi-sname" style="font-size:var(--text-xxs);color:var(--text-faint)">Connected Clients</span></div>
+  `;
+  for (const c of w.clients) {
+    html += `<div class="wrow" style="margin-top:2px;">
+      <span class="wlabel" title="${c.mac}" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:65%">
+        <span style="color:var(--text-faint);margin-right:4px">${c.ipSuffix}</span>${c.name}
+      </span>
+      <span class="wval" style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
+        <span style="color:var(--text-faint); font-size:var(--text-xxs)">${c.band}</span>
+        <div class="sig-bars lvl-${c.lvl}"><div class="b1"></div><div class="b2"></div><div class="b3"></div></div>
+      </span>
+    </div>`;
+  }
+  html += `</div>`;
+  el.innerHTML = html;
+}
+
+// ============================================================
+// OTHER SERVICES MODAL
+// ============================================================
+const OTHER_SERVICES = [
+  { name: 'LuCI', icon: '⚙️', bg: 'var(--blue-dim)' },
+  { name: 'Mihomo', icon: '😺', bg: 'var(--cyan-dim)' },
+  { name: 'AdGuard', icon: '🛡️', bg: 'var(--green-dim)' },
+  { name: 'WiFi AP', icon: '📶', bg: 'var(--purple-dim)' },
+  { name: 'AriaNG', icon: '⬇️', bg: 'var(--blue-dim)' },
+  { name: 'cake-stats', icon: '🍰', bg: 'var(--yellow-dim)' },
+  { name: 'Jellyfin', icon: '🎬', bg: 'var(--purple-dim)' },
+  { name: 'TorrServer', icon: '🧲', bg: 'var(--orange-dim)' },
+  { name: 'Transmission', icon: '🔄', bg: 'var(--red-dim)' },
+  { name: 'Netdata', icon: '📈', bg: 'var(--green-dim)' },
+  { name: 'MeshMonitor', icon: '🌐', bg: 'var(--cyan-dim)' }
+];
+
+function init_other_services() {
+  const grid = $('other-services-grid');
+  if (!grid) return;
+  grid.innerHTML = OTHER_SERVICES.map(s => `
+    <a class="srv-btn" href="#" onclick="return false;" title="${s.name} (Demo)">
+      <div class="srv-icon" style="background:${s.bg}">
+        <span class="fallback-icon">${s.icon}</span>
+      </div>
+      <div class="srv-name">${s.name}</div>
+    </a>
+  `).join('');
+}
+
+function show_other_services() { $('other-services-modal').classList.remove('hidden'); }
+function close_other_services() { $('other-services-modal').classList.add('hidden'); }
+
+// ============================================================
+// SETUP MODAL
+// ============================================================
+function show_setup() { $('setup-modal').classList.remove('hidden'); }
+function modal_skip() { $('setup-modal').classList.add('hidden'); }
+function modal_save() {
+  $('setup-modal').classList.add('hidden');
+}
+function clear_creds() {
+  alert('Demo settings have been reset.');
+  modal_skip();
+}
+
+// Close modals when clicking background
+document.addEventListener('DOMContentLoaded', () => {
+  const overlayOther = $('other-services-modal');
+  if (overlayOther) overlayOther.addEventListener('click', e => { if (e.target === overlayOther) close_other_services(); });
+  const overlayLat = $('latency-modal');
+  if (overlayLat) overlayLat.addEventListener('click', e => { if (e.target === overlayLat) closeLatencyModal(); });
+  const overlaySetup = $('setup-modal');
+  if (overlaySetup) overlaySetup.addEventListener('click', e => { if (e.target === overlaySetup) modal_skip(); });
+});
+
+// ============================================================
+// CLOCK & REALTIME SIMULATION TICKER
+// ============================================================
+function tickClock() {
+  const now = new Date();
+  $('tb-clk').textContent = [now.getHours(), now.getMinutes(), now.getSeconds()].map(x => String(x).padStart(2, '0')).join(':');
+  DEMO_STATE.uptime++;
+  DEMO_STATE.wanUptime++;
+  $('tb-up').textContent = formatUptime(DEMO_STATE.uptime);
+  const wanVal = $('wan-up-val');
+  if (wanVal) wanVal.textContent = formatUptime(DEMO_STATE.wanUptime);
+}
+
+function tickMetrics() {
+  // Gentle organic variance in CPU core loads
+  DEMO_STATE.cores.forEach((c, idx) => {
+    const delta = Math.round((Math.random() * 4 - 2));
+    c.pct = Math.max(1, Math.min(25, c.pct + delta));
+    if (c.pct > c.max) c.max = c.pct;
+  });
+  update_cpu_ui();
+
+  // Subtle traffic rate variance
+  const rxVar = Math.round(DEMO_STATE.wanRx + (Math.random() * 8000 - 4000));
+  const txVar = Math.round(DEMO_STATE.wanTx + (Math.random() * 6000 - 3000));
+  $('tb-wan-rx').innerHTML = `WAN <span style="color:var(--cyan)">&darr;${fmt_b(rxVar)}</span> <span style="color:var(--orange)">&uarr;${fmt_b(txVar)}</span>`;
+
+  // Fluctuations in eth0 and eth2
+  DEMO_STATE.ifaces[0].rx = rxVar;
+  DEMO_STATE.ifaces[0].tx = txVar;
+  DEMO_STATE.ifaces[2].rx = Math.round(421000 + (Math.random() * 30000 - 15000));
+  DEMO_STATE.ifaces[2].tx = Math.round(1156000 + (Math.random() * 50000 - 25000));
+
+  if (!ifaceEditMode) {
+    render_interfaces();
+  }
+
+  // Active conns subtle breathing
+  DEMO_STATE.conns = Math.max(700, Math.min(740, DEMO_STATE.conns + Math.round(Math.random() * 4 - 2)));
+}
+
+// ============================================================
+// INITIALIZATION
+// ============================================================
+init_cores();
+render_storage();
+render_services();
+render_interfaces();
+render_ping();
+render_wan();
+render_clients();
+render_mihomo();
+render_adguard();
+render_wifi();
+init_other_services();
 tickClock();
+update_cpu_ui();
+
+setInterval(tickClock, 1000);
+setInterval(tickMetrics, 2500);
 </script>
 </body>
 </html>
