@@ -2031,6 +2031,39 @@
           },
         ];
 
+        // Helper: render topbar links from current apps state
+        const render_topbar = () => {
+          const topbarOrder = ["LuCI", "WiFi AP", "Mihomo", "AdGuard"];
+          let html = "";
+          topbarOrder.forEach((name) => {
+            const app = apps.find((a) => a.name === name && a.showInTopbar);
+            if (app)
+              html += `<a class="tb-link" href="${app.url}" target="_blank" rel="noopener">${app.name}</a>`;
+          });
+          html +=
+            '<a class="tb-link" href="#" onclick="show_other_services(); return false;" style="color:var(--orange); border-color:var(--border-2);">Other &equiv;</a>';
+          const ct = document.getElementById("tb-links-ct");
+          if (ct) ct.innerHTML = html;
+        };
+
+        // WiFi AP is also known immediately (no port scan needed)
+        if (C.wifi_ap) {
+          const proto = C.wifi_ap_https ? "https" : "http";
+          const port = C.wifi_ap_port || 80;
+          const apUrl = `${proto}://${C.wifi_ap}${port !== 80 ? ":" + port : ""}`;
+          apps.push({
+            name: "WiFi AP",
+            url: apUrl,
+            icon: "📶",
+            bg: "var(--purple-dim)",
+            showInTopbar: true,
+            fav: apUrl + "/favicon.ico",
+          });
+        }
+
+        // Render topbar immediately with what we know (LuCI + WiFi AP)
+        render_topbar();
+
         const checks = [];
 
         // Dynamic check for Mihomo Core
@@ -2058,8 +2091,9 @@
           })(),
         );
 
-        // Check external WiFi AP configuration
-        if (C.wifi_ap) {
+        // Check external WiFi AP configuration (already added above for immediate topbar render)
+        // Re-add only if not already present (C.wifi_ap may have been set after init)
+        if (C.wifi_ap && !apps.find((a) => a.name === "WiFi AP")) {
           const proto = C.wifi_ap_https ? "https" : "http";
           const port = C.wifi_ap_port || 80;
           const apUrl = `${proto}://${C.wifi_ap}${port !== 80 ? ":" + port : ""}`;
@@ -2377,22 +2411,8 @@
         // Wait until all asynchronous status checks settle
         await Promise.allSettled(checks);
 
-        // Render Topbar Links
-        let topbarHtml = "";
-        const topbarOrder = ["LuCI", "Mihomo", "AdGuard", "WiFi AP"];
-
-        topbarOrder.forEach((appName) => {
-          const app = apps.find((a) => a.name === appName && a.showInTopbar);
-          if (app) {
-            topbarHtml += `<a class="tb-link" href="${app.url}" target="_blank" rel="noopener">${app.name}</a>`;
-          }
-        });
-
-        topbarHtml +=
-          '<a class="tb-link" href="#" onclick="show_other_services(); return false;" style="color:var(--orange); border-color:var(--border-2);">Other &equiv;</a>';
-
-        const ct = document.getElementById("tb-links-ct");
-        if (ct) ct.innerHTML = topbarHtml;
+        // Re-render topbar now with full discovered set (Mihomo, AdGuard added by checks)
+        render_topbar();
 
         // Render the Grid Layout with native Favicons and Emoji fallbacks
         const grid = document.getElementById("other-services-grid");
