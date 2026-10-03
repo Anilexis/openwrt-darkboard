@@ -2163,7 +2163,8 @@
             try {
               await fetch(checkUrl, {
                 mode: "no-cors",
-                signal: AbortSignal.timeout(2000),
+                cache: "no-store",
+                signal: AbortSignal.timeout(1500),
               });
               isAlive = true; // if fetch resolves (doesn't throw connection refused), the port is open
             } catch (e) {}
@@ -2383,7 +2384,8 @@
                   try {
                     await fetch(rootUrl, {
                       mode: "no-cors",
-                      signal: AbortSignal.timeout(2000),
+                      cache: "no-store",
+                      signal: AbortSignal.timeout(1500),
                     });
                     alive = true;
                   } catch (e) {}
@@ -2424,7 +2426,7 @@
         apps.forEach((app) => {
           modalHtml += `<a class="srv-btn" href="${app.url}" target="_blank" rel="noopener">
       <div class="srv-icon" style="background:${app.bg}">
-        <img src="${app.fav}" alt="${app.name} icon" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+        <img src="${app.fav}" alt="${app.name} icon" crossorigin="anonymous" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
         <span class="fallback-icon" style="display:none;">${app.icon}</span>
       </div>
       <div class="srv-name">${app.name}</div>
