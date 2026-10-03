@@ -882,13 +882,89 @@ async function rebuild_topbar_links() {
   // Add AdGuard to universal check
   checks.push(checkService(agh_port, 'AdGuard', '', '🛡️', 'var(--green-dim)', true));
 
-  // Run parallel port checks for extra services
-  checks.push(checkService(8096, 'Jellyfin', '', '🎬', 'var(--purple-dim)'));
-  checks.push(checkService(C.cake_stats_port || 11112, 'cake-stats', '', '🍰', 'var(--yellow-dim)'));
-  checks.push(checkService(8090, 'TorrServer', '', '🧲', 'var(--orange-dim)'));
-  checks.push(checkService(9091, 'Transmission', '', '🔄', 'var(--red-dim)'));
-  checks.push(checkService(19999, 'Netdata', '', '📈', 'var(--green-dim)'));
-  checks.push(checkService(8282, 'MeshMonitor', '', '🌐', 'var(--cyan-dim)'));
+
+  // ── Auto-discovery registry ───────────────────────────────────────────────
+  // ports[]     – tried in order, first alive wins (no double-register)
+  // checkPath   – optional: specific API path used for fingerprinting instead
+  //               of '/'. The response must be 200/401/403 (NOT 400/404) to
+  //               count as alive — prevents false positives on shared ports.
+  // urlSuffix   – optional: path appended to the tile's href
+  // favPath     – optional: favicon path (default /favicon.ico)
+  // showInTopbar– optional: pin to topbar (default false)
+  const SERVICE_REGISTRY = [
+    // ── Currently installed ──────────────────────────────────────────────────
+    { ports: [3001, 8282],                 name: 'MeshMonitor',    icon: '🌐', bg: 'var(--cyan-dim)'   },
+    { ports: [8096],                       name: 'Jellyfin',       icon: '🎬', bg: 'var(--purple-dim)' },
+    { ports: [C.cake_stats_port || 11112], name: 'cake-stats',     icon: '🍰', bg: 'var(--yellow-dim)' },
+    { ports: [8090],                       name: 'TorrServer',     icon: '🧲', bg: 'var(--orange-dim)' },
+    { ports: [9091],                       name: 'Transmission',   icon: '🔄', bg: 'var(--red-dim)'    },
+    { ports: [19999],                      name: 'Netdata',        icon: '📈', bg: 'var(--green-dim)'  },
+    // ── Container management ─────────────────────────────────────────────────
+    { ports: [9000, 9443],                 name: 'Portainer',      icon: '🐳', bg: 'var(--blue-dim)',   checkPath: '/api/status'             },
+    // ── Download managers ────────────────────────────────────────────────────
+    // qBittorrent: port 8080 is too generic (uhttpd, etc.) — verify via API
+    { ports: [8080],                       name: 'qBittorrent',    icon: '🌊', bg: 'var(--blue-dim)',   checkPath: '/api/v2/app/version'     },
+    { ports: [9092],                       name: 'Transmission 2', icon: '🔄', bg: 'var(--red-dim)'    },
+    // ── Media & Photos ───────────────────────────────────────────────────────
+    { ports: [2283],                       name: 'Immich',         icon: '📷', bg: 'var(--yellow-dim)', checkPath: '/api/server-info/ping'   },
+    { ports: [4533],                       name: 'Navidrome',      icon: '🎶', bg: 'var(--purple-dim)', checkPath: '/rest/ping.view?v=1.8.0&c=check&f=json' },
+    // ── Monitoring & Dashboards ──────────────────────────────────────────────
+    { ports: [3000],                       name: 'Grafana',        icon: '📊', bg: 'var(--orange-dim)', checkPath: '/api/health'             },
+    { ports: [8181],                       name: 'Tautulli',       icon: '📈', bg: 'var(--orange-dim)', checkPath: '/api/v2?apikey=x&cmd=status' },
+    { ports: [7575],                       name: 'Homarr',         icon: '🏠', bg: 'var(--cyan-dim)'   },
+    // ── *arr suite ───────────────────────────────────────────────────────────
+    { ports: [7878],                       name: 'Radarr',         icon: '🎞️', bg: 'var(--yellow-dim)', checkPath: '/api/v3/system/status'   },
+    { ports: [8989],                       name: 'Sonarr',         icon: '📺', bg: 'var(--blue-dim)',   checkPath: '/api/v3/system/status'   },
+    { ports: [8686],                       name: 'Lidarr',         icon: '🎵', bg: 'var(--purple-dim)', checkPath: '/api/v1/system/status'   },
+    { ports: [8787],                       name: 'Readarr',        icon: '📚', bg: 'var(--cyan-dim)',   checkPath: '/api/v1/system/status'   },
+    { ports: [9696],                       name: 'Prowlarr',       icon: '🔍', bg: 'var(--red-dim)',    checkPath: '/api/v1/system/status'   },
+    { ports: [6767],                       name: 'Bazarr',         icon: '💬', bg: 'var(--green-dim)',  checkPath: '/api/episodes'           },
+    { ports: [5055],                       name: 'Overseerr',      icon: '🎯', bg: 'var(--blue-dim)',   checkPath: '/api/v1/status'          },
+    // ── Smart home ───────────────────────────────────────────────────────────
+    { ports: [8123],                       name: 'Home Assist.',   icon: '🏠', bg: 'var(--orange-dim)', checkPath: '/api/'                   },
+  ];
+
+  for (const svc of SERVICE_REGISTRY) {
+    checks.push((async () => {
+      for (const port of svc.ports) {
+        const probePath = svc.checkPath || '/';
+        const probeUrl  = `http://${host}:${port}${probePath}`;
+        const rootUrl   = `http://${host}:${port}/`;
+        let alive = false;
+
+        // curl probe (runs on router, bypasses CORS)
+        try {
+          const r = await file_exec('/usr/bin/curl', ['-s', '-m', '2', '-o', '/dev/null', '-w', '%{http_code}', probeUrl]);
+          const code = parseInt((r.stdout || '').trim());
+          // With checkPath: accept 200/401/403 (service-specific auth).
+          // Reject 400/404 — those indicate the path doesn't exist → wrong service.
+          // Without checkPath ('/'): any HTTP response means the port is open.
+          if (svc.checkPath) {
+            alive = [200, 201, 401, 403].includes(code);
+          } else {
+            alive = code > 0 && code < 600;
+          }
+        } catch(e) {}
+
+        // fetch fallback (browser-side, only for generic '/' check)
+        if (!alive && !svc.checkPath) {
+          try {
+            await fetch(rootUrl, { mode: 'no-cors', signal: AbortSignal.timeout(2000) });
+            alive = true;
+          } catch(e) {}
+        }
+
+        if (alive) {
+          const tileUrl = svc.urlSuffix ? `http://${host}:${port}${svc.urlSuffix}` : rootUrl;
+          apps.push({ name: svc.name, url: tileUrl, icon: svc.icon, bg: svc.bg,
+            showInTopbar: svc.showInTopbar || false,
+            fav: `http://${host}:${port}${svc.favPath || '/favicon.ico'}` });
+          break; // first responsive port wins — don't double-register
+        }
+      }
+    })());
+  }
+
 
   // Wait until all asynchronous status checks settle
   await Promise.allSettled(checks);
@@ -2881,7 +2957,7 @@ async function reboot_router(btn) {
 // ===== MAIN LOOP =====
 async function init() {
   try { await luci_login(); } catch(e) { console.warn('login', e); }
-  await rebuild_topbar_links();
+  rebuild_topbar_links(); // fire-and-forget: port scan runs in background, doesn't block main init
   await Promise.allSettled([init_cores(), update_board(), init_lat_groups()]);
   init_wifi_admin_link();
   async function fast() {
