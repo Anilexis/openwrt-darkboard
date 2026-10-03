@@ -3227,6 +3227,9 @@
           const devs = r?.[1];
           if (!devs) return;
           const eth = Object.keys(devs).filter((n) => /^eth\d+$/.test(n));
+
+          // Pass 1: free — already in network.device response
+          const needFallback = [];
           for (const name of eth) {
             const d = devs[name];
             let spd = d.speed;
@@ -3236,25 +3239,30 @@
               linkSpeeds[name] = spd;
               continue;
             }
-            try {
-              const r2 = await file_exec("/bin/cat", [
-                "/sys/class/net/" + name + "/speed",
-              ]);
-              const v = parseInt((r2.stdout || "").trim());
-              if (v > 0) {
-                linkSpeeds[name] = v;
-                continue;
-              }
-            } catch (e) {}
-            try {
-              const r2 = await file_exec("/usr/sbin/ethtool", [name]);
-              const m = (r2.stdout || "").match(/Speed:\s*(\d+)Mb/);
-              if (m) {
-                linkSpeeds[name] = parseInt(m[1]);
-                continue;
-              }
-            } catch (e) {}
+            needFallback.push(name);
           }
+
+          // Pass 2: cat sysfs + ethtool — parallel for all remaining interfaces
+          await Promise.all(
+            needFallback.map(async (name) => {
+              try {
+                const r2 = await file_exec("/bin/cat", [
+                  "/sys/class/net/" + name + "/speed",
+                ]);
+                const v = parseInt((r2.stdout || "").trim());
+                if (v > 0) {
+                  linkSpeeds[name] = v;
+                  return;
+                }
+              } catch (e) {}
+              try {
+                const r2 = await file_exec("/usr/sbin/ethtool", [name]);
+                const m = (r2.stdout || "").match(/Speed:\s*(\d+)Mb/);
+                if (m) linkSpeeds[name] = parseInt(m[1]);
+              } catch (e) {}
+            }),
+          );
+
           linkSpeedsFetched = true;
         } catch (e) {}
       }
@@ -4371,11 +4379,15 @@
         try {
           const ls = await file_exec("/bin/ls", ["/tmp/hosts/"]);
           if (ls?.stdout) {
-            for (const fname of ls.stdout
+            const fnames = ls.stdout
               .split("\n")
               .map((s) => s.trim())
-              .filter(Boolean)) {
-              const raw = await file_read("/tmp/hosts/" + fname);
+              .filter(Boolean);
+            // Read all files in parallel — Promise.all preserves order
+            const raws = await Promise.all(
+              fnames.map((f) => file_read("/tmp/hosts/" + f).catch(() => null)),
+            );
+            for (const raw of raws) {
               if (!raw) continue;
               for (const line of raw.split("\n")) {
                 const p = line.replace(/#.*/, "").trim().split(/\s+/);
@@ -4609,31 +4621,36 @@
               .split("\n")
               .map((s) => s.trim())
               .filter((n) => /^wl|^ath|^ra|^mt|^wlan/.test(n));
-            for (const wif of names) {
-              const r = await file_exec("/usr/bin/iwinfo", [wif, "assoclist"]);
-              const out = (r.stdout || "").replace(/["']/g, ""); // На всякий случай чистим кавычки и тут
-              const macUpper = mac.toUpperCase();
-              if (out.includes(macUpper)) {
-                localWifiFound = true;
-                extraInfo += `<div class="ds"><span class="dl">wifi iface</span><span class="dv" style="color:var(--text-faint)">${wif}</span></div>`;
-                const block = out.split(macUpper)[1];
-                if (block) {
-                  const firstLine = block.split("\n")[0];
-                  const sigMatch = firstLine.match(/([-\d]+\s*dBm)/);
-                  const inactiveMatch = firstLine.match(/(\d+\s*ms\s*ago)/i);
-                  if (sigMatch)
-                    extraInfo += `<div class="ds"><span class="dl">signal</span><span class="dv">${sigMatch[1]}</span></div>`;
-                  if (inactiveMatch)
-                    extraInfo += `<div class="ds"><span class="dl">inactive time</span><span class="dv">${inactiveMatch[1]}</span></div>`;
+            const macUpper = mac.toUpperCase();
+            // Query all interfaces in parallel — equivalent to sequential loop + break
+            const assocResults = await Promise.all(
+              names.map((wif) =>
+                file_exec("/usr/bin/iwinfo", [wif, "assoclist"])
+                  .then((r) => ({ wif, out: (r.stdout || "").replace(/["']/g, "") }))
+                  .catch(() => ({ wif, out: "" }))
+              )
+            );
+            const found = assocResults.find(({ out }) => out.includes(macUpper));
+            if (found) {
+              const { wif, out } = found;
+              localWifiFound = true;
+              extraInfo += `<div class="ds"><span class="dl">wifi iface</span><span class="dv" style="color:var(--text-faint)">${wif}</span></div>`;
+              const block = out.split(macUpper)[1];
+              if (block) {
+                const firstLine = block.split("\n")[0];
+                const sigMatch = firstLine.match(/([-\d]+\s*dBm)/);
+                const inactiveMatch = firstLine.match(/(\d+\s*ms\s*ago)/i);
+                if (sigMatch)
+                  extraInfo += `<div class="ds"><span class="dl">signal</span><span class="dv">${sigMatch[1]}</span></div>`;
+                if (inactiveMatch)
+                  extraInfo += `<div class="ds"><span class="dl">inactive time</span><span class="dv">${inactiveMatch[1]}</span></div>`;
 
-                  const rateRx = block.match(/RX Rate:\s*([^\n]+)/i);
-                  const rateTx = block.match(/TX Rate:\s*([^\n]+)/i);
-                  if (rateRx)
-                    extraInfo += `<div class="ds"><span class="dl">rx PHY rate</span><span class="dv" style="color:var(--text-muted)">${rateRx[1]}</span></div>`;
-                  if (rateTx)
-                    extraInfo += `<div class="ds"><span class="dl">tx PHY rate</span><span class="dv" style="color:var(--text-muted)">${rateTx[1]}</span></div>`;
-                }
-                break;
+                const rateRx = block.match(/RX Rate:\s*([^\n]+)/i);
+                const rateTx = block.match(/TX Rate:\s*([^\n]+)/i);
+                if (rateRx)
+                  extraInfo += `<div class="ds"><span class="dl">rx PHY rate</span><span class="dv" style="color:var(--text-muted)">${rateRx[1]}</span></div>`;
+                if (rateTx)
+                  extraInfo += `<div class="ds"><span class="dl">tx PHY rate</span><span class="dv" style="color:var(--text-muted)">${rateTx[1]}</span></div>`;
               }
             }
           } catch (e) {}
@@ -5094,29 +5111,34 @@
         }
 
         if (ifaces.length) {
-          for (const iface of ifaces.slice(0, 4)) {
-            try {
-              const r = await file_exec("/usr/bin/iwinfo", [iface, "info"]);
-              const out = r.stdout || "";
-              const ssid = out.match(/ESSID: "([^"]*)"/) || [];
-              const chan = out.match(/Channel: (\d+)/) || [];
-              const mode = out.match(/Mode: (\w+)/) || [];
-              const txpow = out.match(/Tx-Power: (\d+ dBm)/) || [];
-              result += `<div class="wifi-section">
+          // Query all interfaces concurrently — Promise.all preserves ifaces order
+          const ifaceResults = await Promise.all(
+            ifaces.slice(0, 4).map((iface) =>
+              file_exec("/usr/bin/iwinfo", [iface, "info"])
+                .then((r) => ({ iface, out: r.stdout || "" }))
+                .catch(() => ({ iface, out: "" })),
+            ),
+          );
+          for (const { iface, out } of ifaceResults) {
+            if (!out) continue;
+            const ssid = out.match(/ESSID: "([^"]*)"/) || [];
+            const chan = out.match(/Channel: (\d+)/) || [];
+            const mode = out.match(/Mode: (\w+)/) || [];
+            const txpow = out.match(/Tx-Power: (\d+ dBm)/) || [];
+            result += `<div class="wifi-section">
     <div class="wifi-sh">
       <span class="wifi-sname">${iface}</span>
       <span class="sstatus ok">\u2022 up</span>
     </div>`;
-              if (ssid[1])
-                result += `<div class="wrow"><span class="wlabel">SSID</span><span class="wval">${ssid[1]}</span></div>`;
-              if (chan[1])
-                result += `<div class="wrow"><span class="wlabel">channel</span><span class="wval">${chan[1]}</span></div>`;
-              if (mode[1])
-                result += `<div class="wrow"><span class="wlabel">mode</span><span class="wval">${mode[1]}</span></div>`;
-              if (txpow[1])
-                result += `<div class="wrow"><span class="wlabel">tx-power</span><span class="wval">${txpow[1]}</span></div>`;
-              result += `</div>`;
-            } catch (e) {}
+            if (ssid[1])
+              result += `<div class="wrow"><span class="wlabel">SSID</span><span class="wval">${ssid[1]}</span></div>`;
+            if (chan[1])
+              result += `<div class="wrow"><span class="wlabel">channel</span><span class="wval">${chan[1]}</span></div>`;
+            if (mode[1])
+              result += `<div class="wrow"><span class="wlabel">mode</span><span class="wval">${mode[1]}</span></div>`;
+            if (txpow[1])
+              result += `<div class="wrow"><span class="wlabel">tx-power</span><span class="wval">${txpow[1]}</span></div>`;
+            result += `</div>`;
           }
           if (result) return result;
         }
