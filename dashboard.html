@@ -623,7 +623,7 @@
         bottom: 0;
         left: 0;
         right: 0;
-        transition: height 0.8s ease;
+        transition: height 0.45s ease;
         border-radius: 1px;
       }
       .corelbel {
@@ -767,13 +767,13 @@
       .ifr1 {
         display: flex;
         align-items: baseline;
-        justify-content: space-between;
+        gap: 6px;
         font-size: var(--text-sm);
       }
       .ifname {
         font-weight: 500;
-        overflow: hidden;
-        text-overflow: ellipsis;
+        width: 32px;
+        flex-shrink: 0;
         white-space: nowrap;
       }
       .ifname.up {
@@ -782,33 +782,87 @@
       .ifname.down {
         color: var(--text-muted);
       }
-      .ifspd {
+      .ifdev {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        justify-content: center;
+        align-items: baseline;
+        gap: 0;
+        overflow: hidden;
+        white-space: nowrap;
+      }
+      .ifdev-name {
+        color: var(--text-muted);
         font-size: var(--text-xs);
-        color: var(--cyan);
+        font-family: var(--font-mono);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .ifip {
+        color: var(--text-muted);
+        font-size: var(--text-xs);
+        font-family: var(--font-mono);
+        font-variant-numeric: tabular-nums;
+        flex-shrink: 0;
+      }
+      .ifr1-right {
         margin-left: auto;
-        margin-right: 6px;
+        display: inline-flex;
+        align-items: baseline;
+        white-space: nowrap;
+        flex-shrink: 0;
+        font-family: var(--font-mono);
+        font-size: var(--text-xs);
+      }
+      .ifspd {
+        color: var(--cyan);
       }
       .iflink {
-        font-size: var(--text-xs);
         color: var(--text-muted);
       }
       .ifr2 {
         display: flex;
-        gap: 6px;
+        align-items: baseline;
+        min-height: 1.3em;
+        line-height: 1.3;
         font-size: var(--text-xs);
         font-variant-numeric: tabular-nums;
+        font-family: var(--font-mono);
       }
       .ifr2 .rx {
+        width: 68px;
+        flex-shrink: 0;
+        white-space: pre;
         color: var(--cyan);
       }
       .ifr2 .tx {
+        width: 68px;
+        flex-shrink: 0;
+        white-space: pre;
         color: var(--orange);
       }
       .ifr2 .er {
         color: var(--red);
       }
-      .ifr2 span {
-        color: var(--text-muted);
+      .ifr2 .ift-vol {
+        margin-left: auto;
+        display: inline-flex;
+        align-items: baseline;
+        color: var(--text-faint);
+        white-space: pre;
+        font-size: var(--text-xxs);
+      }
+      .ifr2 .ift-rx {
+        white-space: pre;
+      }
+      .ifr2 .ift-sep {
+        margin: 0;
+        color: var(--text-faint);
+      }
+      .ifr2 .ift-tx {
+        white-space: pre;
       }
       /* Dynamic traffic color helpers applied via JS */
       .rx-dim {
@@ -955,9 +1009,11 @@
       .cip {
         color: var(--text-muted);
         font-variant-numeric: tabular-nums;
+        font-family: var(--font-mono);
         white-space: nowrap;
-        margin-left: auto;
-        padding-left: 3px;
+        width: 95px;
+        text-align: left;
+        flex-shrink: 0;
       }
 
       /* ============================================================ WIFI AP */
@@ -1904,7 +1960,9 @@
         // TP Vision / Philips (Smart TVs)
         "1c3008": "Philips", "001a80": "Philips", "2082c0": "Philips", "30894a": "Philips",
         // Samsung Electronics
-        "48bce1": "Samsung", "f47b5e": "Samsung", "5001d9": "Samsung", "0012fb": "Samsung", "34145f": "Samsung", "641cae": "Samsung",
+        "0e2a79": "Samsung", "48bce1": "Samsung", "f47b5e": "Samsung", "5001d9": "Samsung", "0012fb": "Samsung", "34145f": "Samsung", "641cae": "Samsung",
+        // Qualcomm / Airgo (Mobile & Wearable Wi-Fi)
+        "000af5": "Qualcomm",
         // Espressif Systems (ESP8266, ESP32, Meshtastic, Smart Home)
         "f85b1b": "Espressif", "18fe34": "Espressif", "240ac4": "Espressif", "30aea4": "Espressif",
         "84f3eb": "Espressif", "485519": "Espressif", "c44f33": "Espressif", "e05a1b": "Espressif",
@@ -1948,7 +2006,7 @@
         wifi_ap_https: DEFAULTS.wifi_ap_https,
         ariangport: DEFAULTS.ariangport,
         cake_stats_port: DEFAULTS.cake_stats_port,
-        fast: 2000,
+        fast: 250,
         slow: 8000,
         vpn: 5000,
         ping: 300000,
@@ -2593,22 +2651,92 @@
 
       // ===== UTILS =====
       const $ = (id) => document.getElementById(id);
+
+      // Space formatting switch:
+      // 1 = compact: "↓010K/s", "014G / 6.9G"
+      // 2 = spaced:  "↓ 010 K/s", "014 G / 6.9 G" (Change to 1 to rollback)
+      const SPACE_FORMAT = 2;
+      const ARR_SP = SPACE_FORMAT === 2 ? " " : "";
+      const UNIT_SP = SPACE_FORMAT === 2 ? " " : "";
+
+      function fmt_val_3(b) {
+        if (b == null || isNaN(b) || !isFinite(b)) return "---";
+        const a = Math.abs(b);
+        if (a >= 99.5) return String(Math.min(999, Math.round(a)));
+        if (a >= 9.95) return String(Math.round(a)).padStart(3, "\u2007");
+        if (a >= 0.05) return a.toFixed(1);
+        return "000";
+      }
       const fmt_b = (b) => {
         if (b == null || isNaN(b) || !isFinite(b)) return "--";
         const a = Math.abs(b);
-        if (a >= 2 ** 30) return (b / 2 ** 30).toFixed(2) + "G/s";
-        if (a >= 2 ** 20) return (b / 2 ** 20).toFixed(1) + "M/s";
-        if (a >= 2 ** 10) return (b / 2 ** 10).toFixed(0) + "K/s";
-        return Math.round(b) + "B/s";
+        if (a === 0 || a < 0.05) return "000" + UNIT_SP + "B/s";
+        if (a >= 943718400) {
+          return fmt_val_3(b / 1073741824) + UNIT_SP + "G/s";
+        }
+        if (a >= 921600) {
+          return fmt_val_3(b / 1048576) + UNIT_SP + "M/s";
+        }
+        if (a >= 900) {
+          return fmt_val_3(b / 1024) + UNIT_SP + "K/s";
+        }
+        return fmt_val_3(b) + UNIT_SP + "B/s";
       };
       const fmt_mb = (kb) => (kb / 1024).toFixed(0) + " MB";
       const bar_pct = (v, max) => Math.min(100, Math.max(0, (v / max) * 100));
       const fmt_sz = (b) => {
-        if (!b || b <= 0) return "0";
-        if (b >= 2 ** 30) return (b / 2 ** 30).toFixed(1) + "G";
-        if (b >= 2 ** 20) return (b / 2 ** 20).toFixed(0) + "M";
-        return (b / 2 ** 10).toFixed(0) + "K";
+        if (!b || b <= 0) return "000" + UNIT_SP + "B";
+        const a = Math.abs(b);
+        if (a >= 943718400) {
+          return fmt_val_3(b / 1073741824) + UNIT_SP + "G";
+        }
+        if (a >= 921600) {
+          return fmt_val_3(b / 1048576) + UNIT_SP + "M";
+        }
+        if (a >= 900) {
+          return fmt_val_3(b / 1024) + UNIT_SP + "K";
+        }
+        return fmt_val_3(b) + UNIT_SP + "B";
       };
+      const fmt_sz_compact = (b) => {
+        if (!b || b <= 0) return "000B";
+        const a = Math.abs(b);
+        if (a >= 943718400) return fmt_val_3(b / 1073741824) + "G";
+        if (a >= 921600) return fmt_val_3(b / 1048576) + "M";
+        if (a >= 900) return fmt_val_3(b / 1024) + "K";
+        return fmt_val_3(b) + "B";
+      };
+
+      // Smoothing helper with outlier rejection (3 seconds = 12 samples @ 250ms):
+      function smooth_val(arr, val, maxLen = 12) {
+        if (val != null && !isNaN(val) && isFinite(val)) {
+          arr.push(val);
+        }
+        if (arr.length > maxLen) arr.shift();
+        if (arr.length === 0) return 0;
+        if (arr.length <= 3) {
+          return arr.reduce((a, b) => a + b, 0) / arr.length;
+        }
+        const sorted = arr.slice().sort((a, b) => a - b);
+        const median = sorted[Math.floor(sorted.length / 2)];
+        let work = arr.slice();
+        const min = sorted[0];
+        const max = sorted[sorted.length - 1];
+        if (median > 0) {
+          if (max >= median * 4 && sorted[sorted.length - 2] < max * 0.5) {
+            work = work.filter((v) => v !== max);
+          }
+          if (min < median * 0.2 && min > 0 && sorted[1] > min * 2) {
+            work = work.filter((v) => v !== min);
+          }
+        } else {
+          if (max > 0 && sorted[sorted.length - 2] === 0) {
+            work = work.filter((v) => v !== max);
+          }
+        }
+        if (work.length === 0) return median;
+        return work.reduce((a, b) => a + b, 0) / work.length;
+      }
 
       // ===== CLOCK =====
       const tick_clock = () => {
@@ -2821,6 +2949,8 @@
 
       // ===== CPU - /proc/stat always first, no realtime branch =====
       let cpuMethod = "procstat";
+      let cpuH0 = [];
+      let cpuH = [];
       async function update_cpu(prefetched) {
         // ---- PRIMARY: /proc/stat - per-core data ----
         try {
@@ -2845,7 +2975,8 @@
             // Aggregate badge (row 0 = "cpu" = sum of all cores)
             const dt0 = curr[0].total - pCPU[0].total,
               di0 = curr[0].idle - pCPU[0].idle;
-            const p0 = dt0 > 0 ? Math.round((1 - di0 / dt0) * 100) : 0;
+            const p0Raw = dt0 > 0 ? Math.round((1 - di0 / dt0) * 100) : 0;
+            const p0 = Math.round(smooth_val(cpuH0, p0Raw, 12));
             const bdg = $("cpu-bdg");
             bdg.textContent = p0 + "%";
             bdg.className =
@@ -2857,7 +2988,9 @@
               if (!ci || !pi) continue;
               const dt = ci.total - pi.total,
                 di = ci.idle - pi.idle;
-              const p = dt > 0 ? Math.round((1 - di / dt) * 100) : 0;
+              const pRaw = dt > 0 ? Math.round((1 - di / dt) * 100) : 0;
+              cpuH[i] = cpuH[i] || [];
+              const p = Math.round(smooth_val(cpuH[i], pRaw, 12));
               if (p > maxCPU[i]) maxCPU[i] = p;
               const f = $("cc" + i),
                 v = $("cv" + i),
@@ -2941,6 +3074,11 @@
       }
 
       // ===== SYSINFO =====
+      let memUsedH = [],
+        memFreeH = [],
+        memBufH = [],
+        memCchH = [],
+        memAvailH = [];
       async function update_sysinfo(prefetched) {
         const r =
           prefetched?.sys_info ?? (await luci_call("system", "info", {}));
@@ -2984,12 +3122,18 @@
             cached: cch,
             available: avail,
           } = m;
-          const used = total - free,
-            pct = Math.round((used / total) * 100);
+          const usedRaw = total - free;
+          const used = smooth_val(memUsedH, usedRaw, 12);
+          const sFree = smooth_val(memFreeH, free, 12);
+          const sBuf = smooth_val(memBufH, buf || 0, 12);
+          const sCch = smooth_val(memCchH, cch || 0, 12);
+          const sAvail = smooth_val(memAvailH, avail || free, 12);
+
+          const pct = Math.round((used / total) * 100);
           $("ram-v").textContent =
             fmt_mb(used / 1024) + " / " + fmt_mb(total / 1024);
-          $("ram-free").textContent = fmt_mb(free / 1024);
-          $("ram-avail").textContent = fmt_mb((avail || free) / 1024);
+          $("ram-free").textContent = fmt_mb(sFree / 1024);
+          $("ram-avail").textContent = fmt_mb(sAvail / 1024);
           const rp = Math.min(100, pct);
           if (rp > maxRAM) maxRAM = rp;
           const rb = $("ram-b");
@@ -2998,17 +3142,17 @@
           const rmx = $("ram-max-bar");
           if (rmx) rmx.style.left = maxRAM + "%";
           if (buf) {
-            const bp = bar_pct(buf, total);
+            const bp = bar_pct(sBuf, total);
             if (bp > maxBuf) maxBuf = bp;
-            $("buf-v").textContent = fmt_mb(buf / 1024);
+            $("buf-v").textContent = fmt_mb(sBuf / 1024);
             $("buf-b").style.width = bp + "%";
             const bmx = $("buf-max-bar");
             if (bmx) bmx.style.left = maxBuf + "%";
           }
           if (cch) {
-            const cp = bar_pct(cch, total);
+            const cp = bar_pct(sCch, total);
             if (cp > maxCch) maxCch = cp;
-            $("cch-v").textContent = fmt_mb(cch / 1024);
+            $("cch-v").textContent = fmt_mb(sCch / 1024);
             $("cch-b").style.width = cp + "%";
             const cmx = $("cch-max-bar");
             if (cmx) cmx.style.left = maxCch + "%";
@@ -3341,9 +3485,26 @@
           let html = "";
           for (const [name] of entries) {
             html += `<div class="iface" id="if-${name}">
-        <div class="ifr1"><span class="ifname" id="ifn-${name}"></span><span class="ifspd" id="ifs-${name}"></span><span class="iflink" id="ifl-${name}"></span></div>
-        <div class="ifr2"><span class="rx" id="ifrx-${name}"></span><span class="tx" id="iftx-${name}"></span><span class="er" id="ife-${name}"></span>
-          <span style="margin-left:auto;color:var(--text-faint)" id="ift-${name}"></span>
+        <div class="ifr1">
+          <span class="ifname" id="ifn-${name}"></span>
+          <span class="ifdev" id="ifd-${name}">
+            <span class="ifdev-name" id="ifdn-${name}"></span>
+            <span class="ifip" id="ifi-${name}"></span>
+          </span>
+          <span class="ifr1-right" id="ifr1r-${name}">
+            <span class="ifspd" id="ifs-${name}"></span>
+            <span class="iflink" id="ifl-${name}"></span>
+          </span>
+        </div>
+        <div class="ifr2">
+          <span class="rx" id="ifrx-${name}"></span>
+          <span class="tx" id="iftx-${name}"></span>
+          <span class="er" id="ife-${name}"></span>
+          <span class="ift-vol" id="ift-${name}">
+            <span class="ift-rx" id="ifvrx-${name}"></span>
+            <span class="ift-sep" id="ifsep-${name}">/</span>
+            <span class="ift-tx" id="ifvtx-${name}"></span>
+          </span>
         </div>
       </div>`;
           }
@@ -3379,20 +3540,33 @@
             txRate = 0;
           if (pNet[name]) {
             const dt = (now - pNet[name].ts) / 1000;
-            if (dt > 0.5) {
-              const rxr = (rx - pNet[name].rx) / dt,
-                txr = (tx - pNet[name].tx) / dt;
-              if (rxr >= 0 && rxr < 1.25e9) {
-                rr = fmt_b(rxr);
-                rxRate = rxr;
+            if (dt > 0.2) {
+              const rawRx = (rx - pNet[name].rx) / dt,
+                rawTx = (tx - pNet[name].tx) / dt;
+              if (rawRx >= 0 && rawRx < 1.25e9) {
+                pNet[name].rxH = pNet[name].rxH || [];
+                rxRate = smooth_val(pNet[name].rxH, rawRx, 12);
+                rr = fmt_b(rxRate);
               } else rr = "--";
-              if (txr >= 0 && txr < 1.25e9) {
-                tr = fmt_b(txr);
-                txRate = txr;
+              if (rawTx >= 0 && rawTx < 1.25e9) {
+                pNet[name].txH = pNet[name].txH || [];
+                txRate = smooth_val(pNet[name].txH, rawTx, 12);
+                tr = fmt_b(txRate);
               } else tr = "--";
             }
           }
-          pNet[name] = { rx, tx, ts: now };
+          const prevDownZero = pNet[name]?.downPrevZero ?? true;
+          const prevUpZero = pNet[name]?.upPrevZero ?? true;
+
+          pNet[name] = {
+            rx,
+            tx,
+            ts: now,
+            rxH: pNet[name]?.rxH || [],
+            txH: pNet[name]?.txH || [],
+            downPrevZero: prevDownZero,
+            upPrevZero: prevUpZero,
+          };
 
           const erx = s.rx_errors || 0,
             etx = s.tx_errors || 0;
@@ -3430,34 +3604,78 @@
 
           const erxEl = $(`ifrx-${name}`);
           const etxEl = $(`iftx-${name}`);
-          const et = $(`ift-${name}`);
+          const vrxEl = $(`ifvrx-${name}`);
+          const vtxEl = $(`ifvtx-${name}`);
+          const volEl = $(`ift-${name}`);
 
-          if (isLan) {
-            // LAN: Client Download is Router TX (Cyan color)
-            if (erxEl) {
-              erxEl.textContent = "↓" + tr;
-              erxEl.className = `rx rx-${getSfx(txRate)}`;
+          const downRate = isLan ? txRate : rxRate;
+          const upRate = isLan ? rxRate : txRate;
+          const downRateStr = isLan ? tr : rr;
+          const upRateStr = isLan ? rr : tr;
+          const downVol = isLan ? tx : rx;
+          const upVol = isLan ? rx : tx;
+
+          if (erxEl) {
+            if (!up) {
+              erxEl.textContent = "";
+              erxEl.className = "rx";
+              pNet[name].downPrevZero = true;
+            } else if (downRate >= 0.05) {
+              pNet[name].downPrevZero = false;
+              erxEl.textContent = "↓" + ARR_SP + downRateStr;
+              erxEl.className = `rx rx-${getSfx(downRate)}`;
+            } else {
+              if (!prevDownZero) {
+                // First zero occurrence after active traffic: show 000B once
+                erxEl.textContent = "↓" + ARR_SP + downRateStr;
+                erxEl.className = "rx rx-dim";
+                pNet[name].downPrevZero = true;
+              } else {
+                // Previous was already 000B: disappear!
+                erxEl.textContent = "";
+                erxEl.className = "rx";
+              }
             }
-            // LAN: Client Upload is Router RX (Orange color)
-            if (etxEl) {
-              etxEl.textContent = "↑" + rr;
-              etxEl.className = `tx tx-${getSfx(rxRate)}`;
+          }
+          if (etxEl) {
+            if (!up) {
+              etxEl.textContent = "";
+              etxEl.className = "tx";
+              pNet[name].upPrevZero = true;
+            } else if (upRate >= 0.05) {
+              pNet[name].upPrevZero = false;
+              etxEl.textContent = "↑" + ARR_SP + upRateStr;
+              etxEl.className = `tx tx-${getSfx(upRate)}`;
+            } else {
+              if (!prevUpZero) {
+                etxEl.textContent = "↑" + ARR_SP + upRateStr;
+                etxEl.className = "tx tx-dim";
+                pNet[name].upPrevZero = true;
+              } else {
+                etxEl.textContent = "";
+                etxEl.className = "tx";
+              }
             }
-            // Display Volume: Download / Upload
-            if (et) et.textContent = fmt_sz(tx) + "/" + fmt_sz(rx);
-          } else {
-            // WAN: Router Download is Router RX (Cyan color)
-            if (erxEl) {
-              erxEl.textContent = "↓" + rr;
-              erxEl.className = `rx rx-${getSfx(rxRate)}`;
+          }
+          const sepEl = $("ifsep-" + name);
+          if (volEl) {
+            const hasDownVol = up && downVol > 0;
+            const hasUpVol = up && upVol > 0;
+            if (hasDownVol || hasUpVol) {
+              volEl.style.display = "inline-flex";
+              if (vrxEl)
+                vrxEl.textContent = hasDownVol
+                  ? "↓" + fmt_sz_compact(downVol)
+                  : "";
+              if (vtxEl)
+                vtxEl.textContent = hasUpVol
+                  ? "↑" + fmt_sz_compact(upVol)
+                  : "";
+              if (sepEl)
+                sepEl.textContent = hasDownVol && hasUpVol ? "/" : "";
+            } else {
+              volEl.style.display = "none";
             }
-            // WAN: Router Upload is Router TX (Orange color)
-            if (etxEl) {
-              etxEl.textContent = "↑" + tr;
-              etxEl.className = `tx tx-${getSfx(txRate)}`;
-            }
-            // Display Volume: Download / Upload
-            if (et) et.textContent = fmt_sz(rx) + "/" + fmt_sz(tx);
           }
 
           // Update generic status fields
@@ -3466,13 +3684,64 @@
             en.textContent = name;
             en.className = "ifname " + (up ? "up" : "down");
           }
+          const ed = $("ifdn-" + name);
+          const eip = $("ifi-" + name);
+          if (ed && eip) {
+            if (!up) {
+              ed.textContent = "";
+              ed.title = "";
+              eip.textContent = "";
+            } else if (name === "eth0" || IFACE_ROLES[name] === "wan") {
+              ed.textContent = "WAN";
+              ed.title = "WAN";
+              eip.textContent = "";
+            } else {
+              const client = window.IFACE_CLIENT_MAP?.[name];
+              if (client) {
+                ed.textContent = client.name || "";
+                ed.title = client.name || "";
+                const lastOctet = client.ip ? client.ip.split(".").pop() : "";
+                eip.textContent = lastOctet ? "." + lastOctet : "";
+              } else {
+                ed.textContent = "";
+                ed.title = "";
+                eip.textContent = "";
+              }
+            }
+          }
           const es = $("ifs-" + name);
-          if (es) es.textContent = spdStr;
           const el = $("ifl-" + name);
-          if (el) el.textContent = up ? "UP" : "DOWN";
+          if (es && el) {
+            if (up) {
+              es.textContent = spdStr;
+              es.style.display = spdStr ? "inline" : "none";
+              el.textContent = "UP";
+              el.className = "iflink up";
+              if (spdStr) {
+                es.style.marginRight = "1ch";
+              } else {
+                es.style.marginRight = "0";
+              }
+            } else {
+              es.textContent = "";
+              es.style.display = "none";
+              es.style.marginRight = "0";
+              el.textContent = "DOWN";
+              el.className = "iflink down";
+            }
+          }
           const ee = $("ife-" + name);
           if (ee)
             ee.textContent = erx > 0 || etx > 0 ? " err:" + (erx + etx) : "";
+
+          // Cache live smoothed stats for wired clients in client details
+          window.IFACE_STATS_CACHE = window.IFACE_STATS_CACHE || {};
+          window.IFACE_STATS_CACHE[name] = {
+            rxTotal: isLan ? tx : rx,
+            txTotal: isLan ? rx : tx,
+            rxSpeed: downRate,
+            txSpeed: upRate,
+          };
         }
 
         $("ct-bdg").textContent = "ct: " + ($("ct-act").textContent || "--");
@@ -3511,6 +3780,8 @@
       // ===== WAN TRAFFIC (topbar) =====
       // WAN device name is discovered once via interface.dump, then cached
       let _wanDevName = "";
+      let wanRxH = [],
+        wanTxH = [];
       function _resolveWanDev(ifDumpResult) {
         if (_wanDevName) return _wanDevName;
         const ifaces = ifDumpResult?.[1]?.interface || [];
@@ -3540,15 +3811,19 @@
           const now = Date.now();
           if (wanTsPrev > 0) {
             const dt = (now - wanTsPrev) / 1000;
-            if (dt > 0.5) {
+            if (dt > 0.2) {
               const rxr = (rx - wanRxPrev) / dt,
                 txr = (tx - wanTxPrev) / dt;
               if (rxr >= 0 && txr >= 0) {
+                const rxAvg = smooth_val(wanRxH, rxr, 12);
+                const txAvg = smooth_val(wanTxH, txr, 12);
                 $("tb-wan-rx").innerHTML =
                   'WAN <span style="color:var(--cyan)">\u2193' +
-                  fmt_b(rxr) +
+                  ARR_SP +
+                  fmt_b(rxAvg) +
                   '</span> <span style="color:var(--orange)">\u2191' +
-                  fmt_b(txr) +
+                  ARR_SP +
+                  fmt_b(txAvg) +
                   "</span>";
               }
             }
@@ -3760,8 +4035,10 @@
           if (wan) {
             let h = "";
             const ip4 = wan["ipv4-address"]?.[0]?.address;
-            if (ip4)
+            if (ip4) {
+              window.WAN_IP_CACHE = ip4;
               h += `<div class="ds"><span class="dl">WAN IP</span><span class="dv ok">${ip4}</span></div>`;
+            }
             const gw = wan.route?.find((r) => r.target === "0.0.0.0")?.nexthop;
             if (gw)
               h += `<div class="ds"><span class="dl">gateway</span><span class="dv">${gw}</span></div>`;
@@ -4414,6 +4691,24 @@
       let apWifiClientsCache = {};
       let apWifiClientsTs = 0;
 
+      const WIFI_CACHE_KEY = "darkboard_wifi_cache";
+      function get_wifi_cache() {
+        try {
+          const c = JSON.parse(localStorage.getItem(WIFI_CACHE_KEY) || "{}");
+          if (!c["00:0a:f5:6e:e1:b3"]) {
+            c["00:0a:f5:6e:e1:b3"] = { band: "2.4G", apHostname: "TicWatch" };
+          }
+          return c;
+        } catch (e) {
+          return { "00:0a:f5:6e:e1:b3": { band: "2.4G", apHostname: "TicWatch" } };
+        }
+      }
+      function save_wifi_cache(cache) {
+        try {
+          localStorage.setItem(WIFI_CACHE_KEY, JSON.stringify(cache));
+        } catch (e) {}
+      }
+
       async function get_ap_wifi_clients() {
         const now = Date.now();
         if (
@@ -4436,6 +4731,7 @@
           const out = (snmp?.stdout || "").replace(/["']/g, "").trim();
           if (out) {
             const map = {};
+            const cache = get_wifi_cache();
             for (const line of out.split("\n")) {
               const p = line.trim().split(/\s+/);
               if (p.length >= 4) {
@@ -4458,8 +4754,22 @@
                 }
                 const sig = parseInt(sigStr) || -99;
                 map[mac] = { ip, band, apHostname, sig, sigStr };
+                if (
+                  apHostname &&
+                  apHostname !== "*" &&
+                  apHostname !== "?" &&
+                  apHostname.toLowerCase() !== "unknown"
+                ) {
+                  cache[mac] = {
+                    band,
+                    apHostname,
+                    ip: ip !== "Unknown" ? ip : (cache[mac]?.ip || ""),
+                    lastSeen: now,
+                  };
+                }
               }
             }
+            save_wifi_cache(cache);
             apWifiClientsCache = map;
             apWifiClientsTs = now;
           }
@@ -4790,21 +5100,44 @@
             (parseInt(b.ip.split(".")[3]) || 0),
         );
 
+        const wifiCache = get_wifi_cache();
+        const apMac = (
+          allLeases.find((l) => l.ip === C.wifi_ap)?.mac || ""
+        ).toLowerCase();
+        const apBridgePort = apMac ? bridgePorts[apMac] : "";
+
         // --- Render using dynamic classification and bridge ports ---
+        const ifaceClientMap = {};
         let html = "";
         for (const l of leases) {
           const mac = (l.mac || "").toLowerCase().trim();
-          const wifiClient = apClients[mac] || localWifi[mac] || null;
-          const isWifi = !!wifiClient;
+          const liveWifi = apClients[mac] || localWifi[mac] || null;
+          const cachedWifi = wifiCache[mac] || null;
+          const wifiClient = liveWifi || cachedWifi || null;
+          const isBehindAp = !!(
+            bridgePorts[mac] &&
+            apBridgePort &&
+            bridgePorts[mac] === apBridgePort &&
+            l.ip !== C.wifi_ap
+          );
+          const isWifi = !!liveWifi || !!cachedWifi || isBehindAp;
           const bridgeIface = isWifi ? "" : (bridgePorts[mac] || "");
 
-          if (
-            (!l.name || l.name === "*" || l.name === "") &&
-            wifiClient?.apHostname &&
-            wifiClient.apHostname !== "*" &&
-            wifiClient.apHostname !== "?"
-          ) {
-            l.name = wifiClient.apHostname;
+          if (!l.name || l.name === "*" || l.name === "") {
+            const candidateName =
+              liveWifi?.apHostname ||
+              cachedWifi?.apHostname ||
+              macNameMap[mac] ||
+              ipNameMap[l.ip] ||
+              "";
+            if (
+              candidateName &&
+              candidateName !== "*" &&
+              candidateName !== "?" &&
+              candidateName.toLowerCase() !== "unknown"
+            ) {
+              l.name = candidateName.replace(/\.lan$/i, "");
+            }
           }
 
           const cls = classify_client(
@@ -4843,12 +5176,19 @@
               ? l.name
               : mac.toUpperCase().replace(/:/g, "").slice(0, 12);
 
+          if (detectedIface) {
+            if (!ifaceClientMap[detectedIface] || devType === "ap") {
+              ifaceClientMap[detectedIface] = { name: displayName, ip: l.ip };
+            }
+          }
+
           html += `<div class="client-row" onclick="show_client_details('${l.ip}', '${mac}', '${displayName.replace(/'/g, "\\'")}', '${devType}', '${detectedIface}')">
       <i class="cicon ${bandClass}" title="${devType}">${sym}</i>
       <span class="cname" title="${mac}">${displayName}</span>
       <span class="cip">${l.ip}</span>
     </div>`;
         }
+        window.IFACE_CLIENT_MAP = ifaceClientMap;
 
         if (selectedClientData) {
           const stillExists = leases.find(
@@ -4869,10 +5209,24 @@
         bdg.style.cssText = "";
       }
 
+      let clientAccumRx = 0,
+        clientAccumTx = 0;
+      let clientRxH = [],
+        clientTxH = [];
+
+      let _clientRxPrevZero = true;
+      let _clientTxPrevZero = true;
+
       function show_client_details(ip, mac, name, type, iface) {
         selectedClientData = { ip, mac, name, type, iface };
         clientStatsPrev = null;
         clientStatsTs = 0;
+        clientAccumRx = 0;
+        clientAccumTx = 0;
+        clientRxH = [];
+        clientTxH = [];
+        _clientRxPrevZero = true;
+        _clientTxPrevZero = true;
         $("clients-p").innerHTML =
           '<div class="met"><span class="ml muted">loading data...</span></div>';
         if (clientDetailTimer) clearTimeout(clientDetailTimer);
@@ -4883,6 +5237,12 @@
         selectedClientData = null;
         clientStatsPrev = null;
         clientStatsTs = 0;
+        clientAccumRx = 0;
+        clientAccumTx = 0;
+        clientRxH = [];
+        clientTxH = [];
+        _clientRxPrevZero = true;
+        _clientTxPrevZero = true;
         if (clientDetailTimer) clearTimeout(clientDetailTimer);
         update_clients();
       }
@@ -4897,24 +5257,61 @@
         const now = Date.now();
         let extraInfo = "";
 
-        // 1. Get Active Connections Count (Conntrack)
+        // 1. Get Active Connections & Conntrack Flow Byte Counters
+        let activeConns = 0;
+        let conntrackRxTotal = 0;
+        let conntrackTxTotal = 0;
+        const conntrackFlows = {};
+
         try {
           const ct = await file_exec("/bin/grep", [
-            "-c",
             ip,
             "/proc/net/nf_conntrack",
           ]);
-          const count = parseInt((ct.stdout || "").trim());
-          if (!isNaN(count)) {
+          const raw = ct.stdout || "";
+          if (raw) {
+            const lines = raw.trim().split("\n");
+            for (const line of lines) {
+              if (!line || !line.includes(ip)) continue;
+              const m = line.match(
+                /src=(\S+)\s+dst=(\S+)(?:\s+sport=(\d+)\s+dport=(\d+))?.*?bytes=(\d+).*?src=(\S+)\s+dst=(\S+)(?:\s+sport=(\d+)\s+dport=(\d+))?.*?bytes=(\d+)/
+              );
+              if (m) {
+                const [, s1, d1, sp1, dp1, b1, s2, d2, sp2, dp2, b2] = m;
+                const bytes1 = parseInt(b1, 10) || 0;
+                const bytes2 = parseInt(b2, 10) || 0;
+                let flowRx = 0,
+                  flowTx = 0,
+                  flowKey = "";
+                if (s1 === ip) {
+                  activeConns++;
+                  flowTx = bytes1;
+                  flowRx = bytes2;
+                  flowKey = `${s1}:${sp1 || 0}->${d1}:${dp1 || 0}`;
+                } else if (s2 === ip) {
+                  activeConns++;
+                  flowTx = bytes2;
+                  flowRx = bytes1;
+                  flowKey = `${s2}:${sp2 || 0}->${s1}:${sp1 || 0}`;
+                }
+                if (flowKey) {
+                  conntrackFlows[flowKey] = { rx: flowRx, tx: flowTx };
+                  conntrackRxTotal += flowRx;
+                  conntrackTxTotal += flowTx;
+                }
+              }
+            }
+          }
+          if (activeConns > 0) {
             const color =
-              count > 300
+              activeConns > 300
                 ? "var(--red)"
-                : count > 100
+                : activeConns > 100
                   ? "var(--yellow)"
-                  : count === 0
-                    ? "var(--text-faint)"
-                    : "var(--cyan)";
-            extraInfo += `<div class="ds"><span class="dl">active conns</span><span class="dv" style="color:${color}">${count}</span></div>`;
+                  : "var(--cyan)";
+            extraInfo += `<div class="ds"><span class="dl">active conns</span><span class="dv" style="color:${color}">${activeConns}</span></div>`;
+          } else {
+            extraInfo += `<div class="ds"><span class="dl">active conns</span><span class="dv" style="color:var(--text-faint)">0</span></div>`;
           }
         } catch (e) {}
 
@@ -4928,16 +5325,7 @@
           extraInfo += `<div class="ds"><span class="dl">arp state</span><span class="dv" style="color:${col}">${state}</span></div>`;
         } catch (e) {}
 
-        // 3. Get traffic byte counters
-        if (iface && iface.startsWith("eth")) {
-          const r = await luci_call("network.device", "status", {});
-          const devs = Array.isArray(r) ? r[1] : r?.[1];
-          if (devs && devs[iface]) {
-            const s = devs[iface].statistics || {};
-            rxTotal = s.tx_bytes || 0;
-            txTotal = s.rx_bytes || 0;
-          }
-        }
+        // 3. Wi-Fi checks (Local & External AP)
         if (
           !iface ||
           !iface.startsWith("eth") ||
@@ -4950,7 +5338,7 @@
         ) {
           let localWifiFound = false;
 
-          // 4A. Try local Wi-Fi via iwinfo
+          // 3A. Try local Wi-Fi via iwinfo
           try {
             const wifs = await file_exec("/bin/ls", ["/sys/class/net/"]);
             const names = (wifs.stdout || "")
@@ -4991,7 +5379,7 @@
             }
           } catch (e) {}
 
-          // 4B. Try External AP via SNMP
+          // 3B. Try External AP via SNMP
           if (!localWifiFound && C.wifi_ap) {
             try {
               const snmp = await file_exec("/usr/bin/snmpwalk", [
@@ -5053,22 +5441,96 @@
 
         if (selectedClientData?.ip !== ip) return;
 
-        // Calculate speeds
-        if (rxTotal > 0 || txTotal > 0) {
+        // 4. Get traffic byte counters & calculate speeds
+        const isDedicatedWired =
+          iface &&
+          iface.startsWith("eth") &&
+          type !== "wf" &&
+          type !== "wifi" &&
+          type !== "ap" &&
+          type !== "iot" &&
+          type !== "it";
+
+        if (isDedicatedWired && window.IFACE_STATS_CACHE?.[iface]) {
+          const cached = window.IFACE_STATS_CACHE[iface];
+          rxTotal = cached.rxTotal || 0;
+          txTotal = cached.txTotal || 0;
+          rxSpeed = cached.rxSpeed || 0;
+          txSpeed = cached.txSpeed || 0;
+        } else if (isDedicatedWired) {
+          const r = await luci_call("network.device", "status", {});
+          const devs = Array.isArray(r) ? r[1] : r?.[1];
+          if (devs && devs[iface]) {
+            const s = devs[iface].statistics || {};
+            rxTotal = s.tx_bytes || 0;
+            txTotal = s.rx_bytes || 0;
+          }
+          if (rxTotal > 0 || txTotal > 0) {
+            if (
+              clientStatsPrev &&
+              clientStatsPrev.ip === ip &&
+              clientStatsPrev.isWired &&
+              clientStatsTs > 0
+            ) {
+              const dt = (now - clientStatsTs) / 1000;
+              if (dt > 0.2) {
+                rxSpeed = Math.max(0, (rxTotal - clientStatsPrev.rx) / dt);
+                txSpeed = Math.max(0, (txTotal - clientStatsPrev.tx) / dt);
+              }
+            }
+            clientStatsPrev = { ip, isWired: true, rx: rxTotal, tx: txTotal };
+            clientStatsTs = now;
+          }
+        } else {
+          // Wireless client or AP-connected client: use conntrack flow tracking
           if (
             clientStatsPrev &&
             clientStatsPrev.ip === ip &&
+            !clientStatsPrev.isWired &&
+            clientStatsPrev.flows &&
             clientStatsTs > 0
           ) {
             const dt = (now - clientStatsTs) / 1000;
-            if (dt > 0.5) {
-              rxSpeed = Math.max(0, (rxTotal - clientStatsPrev.rx) / dt);
-              txSpeed = Math.max(0, (txTotal - clientStatsPrev.tx) / dt);
+            if (dt > 0.2) {
+              let rxDelta = 0,
+                txDelta = 0;
+              for (const [key, flow] of Object.entries(conntrackFlows)) {
+                const prev = clientStatsPrev.flows[key];
+                if (prev) {
+                  rxDelta += Math.max(0, flow.rx - prev.rx);
+                  txDelta += Math.max(0, flow.tx - prev.tx);
+                } else {
+                  rxDelta += flow.rx;
+                  txDelta += flow.tx;
+                }
+              }
+              rxSpeed = rxDelta / dt;
+              txSpeed = txDelta / dt;
+              clientAccumRx += rxDelta;
+              clientAccumTx += txDelta;
             }
+          } else {
+            clientAccumRx = conntrackRxTotal;
+            clientAccumTx = conntrackTxTotal;
           }
-          clientStatsPrev = { ip, rx: rxTotal, tx: txTotal };
+          rxTotal = Math.max(conntrackRxTotal, clientAccumRx);
+          txTotal = Math.max(conntrackTxTotal, clientAccumTx);
+          clientStatsPrev = {
+            ip,
+            isWired: false,
+            rx: rxTotal,
+            tx: txTotal,
+            flows: conntrackFlows,
+          };
           clientStatsTs = now;
         }
+
+        if (!isDedicatedWired) {
+          rxSpeed = smooth_val(clientRxH, rxSpeed, 12);
+          txSpeed = smooth_val(clientTxH, txSpeed, 12);
+        }
+
+        if (selectedClientData?.ip !== ip) return;
 
         // Build card HTML
         let h = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;padding-bottom:2px;border-bottom:1px solid var(--border-2)">
@@ -5097,20 +5559,47 @@
           h += extraInfo;
         }
 
-        if (rxTotal > 0 || txTotal > 0) {
+        const getSfx = (rate) =>
+          rate >= 25e6 ? "hi" : rate >= 5e6 ? "mid" : rate >= 1e6 ? "lo" : "dim";
+
+        let showClientRx = false;
+        let showClientTx = false;
+
+        if (rxSpeed >= 0.05) {
+          _clientRxPrevZero = false;
+          showClientRx = true;
+        } else if (!_clientRxPrevZero) {
+          showClientRx = true;
+          _clientRxPrevZero = true;
+        }
+
+        if (txSpeed >= 0.05) {
+          _clientTxPrevZero = false;
+          showClientTx = true;
+        } else if (!_clientTxPrevZero) {
+          showClientTx = true;
+          _clientTxPrevZero = true;
+        }
+
+        const hasVol = rxTotal > 0 || txTotal > 0;
+
+        if (hasVol || showClientRx || showClientTx) {
           h += `<hr>`;
-          h += `<div class="ds"><span class="dl">download / upload</span><span class="dv" style="font-size:var(--text-xxs)">
-        <span style="color:var(--cyan)">\u2193${fmt_sz(rxTotal)}</span> <span style="color:var(--orange)">\u2191${fmt_sz(txTotal)}</span>
-      </span></div>`;
-          h += `<div class="ds"><span class="dl">speed</span><span class="dv" style="font-size:var(--text-xxs)">
-        <span style="color:var(--cyan)">\u2193${fmt_b(rxSpeed)}</span> <span style="color:var(--orange)">\u2191${fmt_b(txSpeed)}</span>
-      </span></div>`;
-        } else if (!iface || !iface.startsWith("eth")) {
-          h += `<div class="ds" style="margin-top:4px"><span class="dl" style="color:var(--text-faint);white-space:normal;line-height:1.2">Byte statistics are available for wired LAN ports</span></div>`;
+          if (hasVol) {
+            h += `<div class="ds"><span class="dl">download / upload</span><span class="dv" style="font-size:var(--text-xxs);font-family:var(--font-mono);color:var(--text-faint)">
+              ${rxTotal > 0 ? fmt_sz(rxTotal) : ""} <span style="color:var(--text-faint)">/</span> ${txTotal > 0 ? fmt_sz(txTotal) : ""}
+            </span></div>`;
+          }
+          if (showClientRx || showClientTx) {
+            h += `<div class="ds"><span class="dl">speed</span><span class="dv" style="font-size:var(--text-xxs);font-family:var(--font-mono)">
+              ${showClientRx ? `<span class="rx rx-${getSfx(rxSpeed)}" style="margin-right:8px">\u2193${ARR_SP}${fmt_b(rxSpeed)}</span>` : ""}
+              ${showClientTx ? `<span class="tx tx-${getSfx(txSpeed)}">\u2191${ARR_SP}${fmt_b(txSpeed)}</span>` : ""}
+            </span></div>`;
+          }
         }
 
         $("clients-p").innerHTML = h;
-        clientDetailTimer = setTimeout(update_client_details, 2000);
+        clientDetailTimer = setTimeout(update_client_details, C.fast || 250);
       }
 
       // ===== WIFI AP / LOCAL WIRELESS =====
@@ -5280,6 +5769,25 @@
               const apClients = await get_ap_wifi_clients();
               const clientList = Object.entries(apClients);
               if (clientList.length > 0) {
+                clientList.sort((a, b) => {
+                  let ipA = a[1].ip;
+                  if (!ipA || ipA === "Unknown" || ipA === "*") {
+                    ipA =
+                      window.ROUTER_MAC_TO_IP?.[a[0].toLowerCase()] ||
+                      CLIENT_MAP[a[0].toLowerCase()]?.ip ||
+                      "";
+                  }
+                  let ipB = b[1].ip;
+                  if (!ipB || ipB === "Unknown" || ipB === "*") {
+                    ipB =
+                      window.ROUTER_MAC_TO_IP?.[b[0].toLowerCase()] ||
+                      CLIENT_MAP[b[0].toLowerCase()]?.ip ||
+                      "";
+                  }
+                  const octA = parseInt(ipA.split(".").pop()) || 0;
+                  const octB = parseInt(ipB.split(".").pop()) || 0;
+                  return octA - octB;
+                });
                 html += `<div class="wifi-section"><div class="wifi-sh"><span class="wifi-sname" style="font-size:var(--text-xxs);color:var(--text-faint)">Connected Clients</span></div>`;
                 for (const [mac, info] of clientList) {
                   let ip = info.ip;
@@ -5326,7 +5834,7 @@
 
                   html += `<div class="wrow" style="margin-top:2px;">
                 <span class="wlabel" title="${mac}" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:65%">
-                  ${ipPart ? `<span style="color:var(--text-faint);margin-right:4px">${ipPart}</span>` : ""}${namePart}
+                  ${namePart}${ipPart ? `<span style="color:var(--text-faint);margin-left:5px">${ipPart}</span>` : ""}
                 </span>
                 <span class="wval" style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
                   <span style="color:var(--text-faint); font-size:var(--text-xxs)">${band}</span>
