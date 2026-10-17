@@ -902,20 +902,32 @@
         font-size: var(--text-xxs);
         font-weight: 700;
       }
-      .cicon.w5 {
+      .cicon.pc {
+        color: var(--blue);
+      }
+      .cicon.tv {
+        color: var(--cyan);
+      }
+      .cicon.ap {
+        color: var(--purple);
+      }
+      .cicon.wf {
         color: var(--orange);
       }
-      .cicon.w24 {
+      .cicon.it {
+        color: var(--yellow);
+      }
+      .cicon.iot {
         color: var(--yellow);
       }
       .cicon.eth {
         color: var(--blue);
       }
-      .cicon.ap {
-        color: var(--purple);
+      .cicon.w5 {
+        color: var(--orange);
       }
-      .cicon.tv {
-        color: var(--cyan);
+      .cicon.w24 {
+        color: var(--orange);
       }
       .cname {
         flex: 1;
@@ -1282,7 +1294,7 @@
       <div class="ptitle">
         <span>CLIENTS <span class="badge b-ok" id="cl-bdg">6</span></span>
         <div class="ptitle-r">
-          <label style="display:flex;align-items:center;gap:4px;font-size:var(--text-xxs);color:var(--text-faint);font-weight:400;letter-spacing:0;text-transform:none;cursor:pointer;" title="Show Docker containers">
+          <label id="docker-filter-wrap" style="display:flex;align-items:center;gap:4px;font-size:var(--text-xxs);color:var(--text-faint);font-weight:400;letter-spacing:0;text-transform:none;cursor:pointer;" title="Show Docker containers">
             <input type="checkbox" id="docker-filter-cb" onchange="toggleDockerFilter()" style="accent-color:var(--cyan);margin:0;width:11px;height:11px;cursor:pointer;flex-shrink:0;">
             docker
           </label>
@@ -1546,7 +1558,8 @@ const DEMO_STATE = {
     { ip: '192.168.1.3', name: 'MEDIABOX', mac: 'b8:27:eb:49:1a:2b', type: 'pc', iface: 'eth3', v6: '2a00:1370:812d:1100::15', conns: 12, rx: 3200, tx: 4100, totRx: 1.1 * 1024**3, totTx: 210 * 1024**2 },
     { ip: '192.168.1.4', name: 'TP-Link-AX73', mac: '5c:e9:31:82:70:1a', type: 'ap', iface: 'eth4', conns: 64, rx: 4872, tx: 73000, totRx: 16 * 1024**2, totTx: 32 * 1024**2 },
     { ip: '192.168.1.5', name: 'SonyBravia', mac: 'f4:42:8f:20:9b:33', type: 'tv', iface: 'eth5', conns: 8, rx: 408, tx: 72000, totRx: 3 * 1024**2, totTx: 31 * 1024**2 },
-    { ip: '192.168.1.156', name: 'iPhone-15-Alex', mac: '36:12:4a:bc:88:01', type: 'wifi', iface: '', conns: 26, rx: 12000, tx: 8500, totRx: 240 * 1024**2, totTx: 85 * 1024**2 },
+    { ip: '192.168.1.99', name: 'Roborock-S7', mac: 'f8:5b:1b:22:11:00', type: 'it', iface: '', conns: 4, rx: 1200, tx: 800, totRx: 12 * 1024**2, totTx: 6 * 1024**2 },
+    { ip: '192.168.1.156', name: 'iPhone-15-Alex', mac: '36:12:4a:bc:88:01', type: 'wf', iface: '', conns: 26, rx: 12000, tx: 8500, totRx: 240 * 1024**2, totTx: 85 * 1024**2 },
     { ip: '192.168.1.196', name: 'Pixel-9-Pro-Kate', mac: '42:98:bb:c1:44:90', type: 'wifi', iface: '', conns: 18, rx: 8900, tx: 4200, totRx: 190 * 1024**2, totTx: 56 * 1024**2 },
     { ip: '172.17.0.2', name: 'AdGuard-Container', mac: '02:42:ac:11:00:02', type: 'pc', iface: 'docker0', conns: 15, rx: 1500, tx: 1200, totRx: 45 * 1024**2, totTx: 30 * 1024**2, isDocker: true }
   ],
@@ -1974,18 +1987,37 @@ function render_clients() {
     render_client_details();
     return;
   }
+  const hasDocker = DEMO_STATE.clients.some((c) => c.isDocker);
+  const wrap = $("docker-filter-wrap");
+  if (wrap) wrap.style.display = hasDocker ? "flex" : "none";
+
   const filtered = showDockerClients
     ? DEMO_STATE.clients
-    : DEMO_STATE.clients.filter(c => !c.isDocker);
-  
-  $('cl-bdg').textContent = filtered.length;
-  let html = '';
-  const symMap = { tv: '[TV]', pc: '[PC]', wifi: '[WF]', ap: '[AP]' };
+    : DEMO_STATE.clients.filter((c) => !c.isDocker);
+
+  $("cl-bdg").textContent = filtered.length;
+  let html = "";
+  const symMap = {
+    tv: "[TV]",
+    pc: "[PC]",
+    wf: "[WF]",
+    wifi: "[WF]",
+    ap: "[AP]",
+    it: "[IT]",
+    iot: "[IT]",
+    eth: "[PC]",
+  };
 
   for (const c of filtered) {
-    const iconClass = c.type === 'ap' ? 'ap' : c.type === 'tv' ? 'tv' : c.type === 'wifi' ? 'w5' : 'eth';
+    let iconClass = "pc";
+    if (c.type === "ap") iconClass = "ap";
+    else if (c.type === "tv") iconClass = "tv";
+    else if (c.type === "it" || c.type === "iot") iconClass = "it";
+    else if (c.type === "pc") iconClass = "pc";
+    else if (c.type === "wf" || c.type === "wifi") iconClass = "wf";
+    else if (c.type === "eth") iconClass = "pc";
     html += `<div class="client-row" onclick="show_client_details('${c.ip}')">
-      <i class="cicon ${iconClass}" title="${c.type}">${symMap[c.type] || '[??]'}</i>
+      <i class="cicon ${iconClass}" title="${c.type}">${symMap[c.type] || "[PC]"}</i>
       <span class="cname" title="${c.mac}">${c.name}</span>
       <span class="cip">${c.ip}</span>
     </div>`;

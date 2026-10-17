@@ -65,7 +65,10 @@
         "/tmp/dhcp.leases": ["read"],
         "/sys/class/thermal/thermal_zone*/temp": ["read"],
         "/sys/class/net/*/speed": ["read"],
+        "/sys/class/net/br-lan/brif/*/port_no": ["read"],
         
+        "/usr/sbin/brctl": ["exec"],
+        "/usr/bin/brctl": ["exec"],
         "/usr/bin/snmpwalk": ["exec"],
         "/bin/grep": ["exec"],
         "/sbin/ip": ["exec"],

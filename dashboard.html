@@ -918,20 +918,32 @@
         font-size: var(--text-xxs);
         font-weight: 700;
       }
-      .cicon.w5 {
+      .cicon.pc {
+        color: var(--blue);
+      }
+      .cicon.tv {
+        color: var(--cyan);
+      }
+      .cicon.ap {
+        color: var(--purple);
+      }
+      .cicon.wf {
         color: var(--orange);
       }
-      .cicon.w24 {
+      .cicon.it {
+        color: var(--yellow);
+      }
+      .cicon.iot {
         color: var(--yellow);
       }
       .cicon.eth {
         color: var(--blue);
       }
-      .cicon.ap {
-        color: var(--purple);
+      .cicon.w5 {
+        color: var(--orange);
       }
-      .cicon.tv {
-        color: var(--cyan);
+      .cicon.w24 {
+        color: var(--orange);
       }
       .cname {
         flex: 1;
@@ -1480,8 +1492,9 @@
             >
             <div class="ptitle-r">
               <label
+                id="docker-filter-wrap"
                 style="
-                  display: flex;
+                  display: none;
                   align-items: center;
                   gap: 4px;
                   font-size: var(--text-xxs);
@@ -1865,14 +1878,50 @@
         cake_stats_port: 11112,
       };
 
-      // Static client map: IP -> { type: 'pc'|'tv'|'ap'|'wifi', iface: 'ethN' }
-      // Clients not listed here default to WiFi type
+      // Static client map: IP or MAC -> { type: 'pc'|'tv'|'ap'|'iot'|'eth'|'wf', iface: 'ethN' }
+      // Clients not listed here are automatically classified by DarkBoard
       const CLIENT_MAP = {
-        "192.168.1.2": { type: "pc", iface: "eth2" },
-        "192.168.1.3": { type: "pc", iface: "eth3" },
-        "192.168.1.4": { type: "ap", iface: "eth4" },
-        "192.168.1.5": { type: "tv", iface: "eth5" },
       };
+
+      // Curated OUI database for common consumer device manufacturers (first 6 hex chars)
+      const OUI_VENDORS = {
+        // ASUSTek Computer Inc. (Motherboards, PC NICs)
+        "04421a": "ASUSTek", "c87f54": "ASUSTek", "001bfc": "ASUSTek", "00248c": "ASUSTek",
+        "2c4d54": "ASUSTek", "3c7c3f": "ASUSTek", "40167e": "ASUSTek", "50465d": "ASUSTek",
+        "6045cb": "ASUSTek", "ac9e17": "ASUSTek", "b06ebf": "ASUSTek", "bc6ee0": "ASUSTek",
+        // MSI (Micro-Star INT'L)
+        "002185": "MSI", "002421": "MSI", "d85ed3": "MSI", "001617": "MSI", "4c5262": "MSI",
+        // Gigabyte Technology
+        "001d7d": "Gigabyte", "1c697a": "Gigabyte", "e0d55e": "Gigabyte", "902b34": "Gigabyte", "b42e99": "Gigabyte",
+        // ASRock
+        "7085c2": "ASRock", "bc5ff4": "ASRock", "d05099": "ASRock",
+        // Intel Corporate (Desktop/Server NICs)
+        "001517": "Intel", "001e67": "Intel", "00215c": "Intel", "3cfdfe": "Intel", "8086f2": "Intel", "a44cc8": "Intel",
+        // Realtek Semiconductor
+        "00e04c": "Realtek", "52544c": "Realtek",
+        // LG Electronics (Smart TVs, WebOS)
+        "2cd8ae": "LG", "a823fe": "LG", "cc2d83": "LG", "001c62": "LG", "10f96f": "LG", "203db2": "LG", "58a2b5": "LG", "b86ca8": "LG",
+        // TP Vision / Philips (Smart TVs)
+        "1c3008": "Philips", "001a80": "Philips", "2082c0": "Philips", "30894a": "Philips",
+        // Samsung Electronics
+        "48bce1": "Samsung", "f47b5e": "Samsung", "5001d9": "Samsung", "0012fb": "Samsung", "34145f": "Samsung", "641cae": "Samsung",
+        // Espressif Systems (ESP8266, ESP32, Meshtastic, Smart Home)
+        "f85b1b": "Espressif", "18fe34": "Espressif", "240ac4": "Espressif", "30aea4": "Espressif",
+        "84f3eb": "Espressif", "485519": "Espressif", "c44f33": "Espressif", "e05a1b": "Espressif",
+        "dc4f22": "Espressif", "246f28": "Espressif", "2462ab": "Espressif", "3cd92b": "Espressif",
+        // Raspberry Pi
+        "b827eb": "RaspberryPi", "dca632": "RaspberryPi", "e45f01": "RaspberryPi", "28cdc1": "RaspberryPi",
+        // Apple
+        "000393": "Apple", "000502": "Apple", "147dda": "Apple", "3c22fb": "Apple", "f4f15a": "Apple",
+        // Sony
+        "00014a": "Sony", "001315": "Sony", "f8461c": "Sony", "fc0fe6": "Sony"
+      };
+
+      function get_oui_vendor(mac) {
+        if (!mac) return "";
+        const clean = mac.replace(/[:-]/g, "").toLowerCase().slice(0, 6);
+        return OUI_VENDORS[clean] || "";
+      }
       // Defining all LAN interfaces
       const LAN_IFACES = new Set(
         Object.values(CLIENT_MAP)
@@ -4299,6 +4348,220 @@
         }
       }
 
+      // ===== CLIENT CLASSIFICATION & PORT DISCOVERY =====
+      let bridgePortMapCache = null;
+      let bridgePortMapTs = 0;
+
+      async function get_bridge_port_map() {
+        const now = Date.now();
+        if (bridgePortMapCache && now - bridgePortMapTs < 60000) {
+          return bridgePortMapCache;
+        }
+        const portMap = {}; // port_no (integer) -> iface name ("eth2")
+        try {
+          const ls = await file_exec("/bin/ls", ["/sys/class/net/br-lan/brif/"]);
+          if (ls?.stdout) {
+            const ifaces = ls.stdout
+              .split("\n")
+              .map((s) => s.trim())
+              .filter(Boolean);
+            await Promise.all(
+              ifaces.map(async (iface) => {
+                try {
+                  const pnoRaw = await file_read(
+                    `/sys/class/net/br-lan/brif/${iface}/port_no`,
+                  );
+                  if (pnoRaw) {
+                    const pno = parseInt(pnoRaw.trim(), 16);
+                    if (!isNaN(pno)) portMap[pno] = iface;
+                  }
+                } catch (e) {}
+              }),
+            );
+          }
+        } catch (e) {}
+        if (Object.keys(portMap).length > 0) {
+          bridgePortMapCache = portMap;
+          bridgePortMapTs = now;
+        }
+        return bridgePortMapCache || {};
+      }
+
+      async function get_bridge_mac_ports() {
+        const macToIface = {};
+        try {
+          const portMap = await get_bridge_port_map();
+          let res = await file_exec("/usr/sbin/brctl", ["showmacs", "br-lan"]);
+          if (!res?.stdout) {
+            res = await file_exec("/usr/bin/brctl", ["showmacs", "br-lan"]);
+          }
+          const out = res?.stdout || "";
+          if (out) {
+            for (const line of out.split("\n")) {
+              const p = line.trim().split(/\s+/);
+              if (p.length >= 3 && p[2] === "no") {
+                const pno = parseInt(p[0]);
+                const mac = p[1].toLowerCase();
+                const iface = portMap[pno] || `eth${pno}`;
+                macToIface[mac] = iface;
+              }
+            }
+          }
+        } catch (e) {}
+        return macToIface;
+      }
+
+      let apWifiClientsCache = {};
+      let apWifiClientsTs = 0;
+
+      async function get_ap_wifi_clients() {
+        const now = Date.now();
+        if (
+          Object.keys(apWifiClientsCache).length > 0 &&
+          now - apWifiClientsTs < 8000
+        ) {
+          return apWifiClientsCache;
+        }
+        if (!C.wifi_ap) return apWifiClientsCache;
+        try {
+          const snmp = await file_exec("/usr/bin/snmpwalk", [
+            "-Ovq",
+            "-v",
+            "2c",
+            "-c",
+            "public",
+            C.wifi_ap,
+            'NET-SNMP-EXTEND-MIB::nsExtendOutputFull."wifidetails"',
+          ]);
+          const out = (snmp?.stdout || "").replace(/["']/g, "").trim();
+          if (out) {
+            const map = {};
+            for (const line of out.split("\n")) {
+              const p = line.trim().split(/\s+/);
+              if (p.length >= 4) {
+                const mac = p[0].toLowerCase();
+                let ip = p[1];
+                if (
+                  (!ip || ip === "Unknown" || ip === "*") &&
+                  window.ROUTER_MAC_TO_IP?.[mac]
+                ) {
+                  ip = window.ROUTER_MAC_TO_IP[mac];
+                }
+                const band = p[2];
+                let apHostname = "";
+                let sigStr = "";
+                if (p.length >= 5) {
+                  apHostname = p.slice(3, p.length - 1).join(" ");
+                  sigStr = p[p.length - 1];
+                } else {
+                  sigStr = p[3];
+                }
+                const sig = parseInt(sigStr) || -99;
+                map[mac] = { ip, band, apHostname, sig, sigStr };
+              }
+            }
+            apWifiClientsCache = map;
+            apWifiClientsTs = now;
+          }
+        } catch (e) {}
+        return apWifiClientsCache;
+      }
+
+      async function get_local_wifi_clients() {
+        const map = {};
+        try {
+          const wifs = await file_exec("/bin/ls", ["/sys/class/net/"]);
+          const names = (wifs.stdout || "")
+            .split("\n")
+            .map((s) => s.trim())
+            .filter((n) => /^wl|^ath|^ra|^mt|^wlan/.test(n));
+          await Promise.all(
+            names.map(async (wif) => {
+              try {
+                const r = await file_exec("/usr/bin/iwinfo", [wif, "assoclist"]);
+                const out = (r?.stdout || "").replace(/["']/g, "");
+                if (out) {
+                  for (const line of out.split("\n")) {
+                    const m = line.match(/^([0-9a-f:]{17})/i);
+                    if (m) {
+                      const mac = m[1].toLowerCase();
+                      const sigMatch = line.match(/([-\d]+\s*dBm)/);
+                      map[mac] = {
+                        ip: "",
+                        band: wif.includes("5") ? "5G" : "2.4G",
+                        apHostname: "",
+                        sigStr: sigMatch ? sigMatch[1] : "",
+                        wif,
+                      };
+                    }
+                  }
+                }
+              } catch (e) {}
+            }),
+          );
+        } catch (e) {}
+        return map;
+      }
+
+      function classify_client(ip, mac, hostname, isWifi, wifiClient, bridgeIface) {
+        const m = (mac || "").toLowerCase();
+        // 0. Explicit manual override in CLIENT_MAP (Rule A preserved)
+        if (CLIENT_MAP[ip] && CLIENT_MAP[ip].type) {
+          return {
+            type: CLIENT_MAP[ip].type,
+            iface: CLIENT_MAP[ip].iface || bridgeIface || "",
+          };
+        }
+        if (CLIENT_MAP[m] && CLIENT_MAP[m].type) {
+          return {
+            type: CLIENT_MAP[m].type,
+            iface: CLIENT_MAP[m].iface || bridgeIface || "",
+          };
+        }
+
+        // 1. Check if this is the Access Point / Router itself
+        if (ip === C.wifi_ap) {
+          return { type: "ap", iface: bridgeIface || "eth4" };
+        }
+        if (/^openwrt|^keenetic|^unifi|^mikrotik/i.test(hostname)) {
+          return { type: "ap", iface: bridgeIface || "" };
+        }
+
+        const vendor = get_oui_vendor(m);
+        const nameAndAp = `${hostname} ${wifiClient?.apHostname || ""}`.toLowerCase();
+
+        // 2. Smart TV / Media Box [TV]
+        // Standard TV names, webOS, Tizen, Bravia, Apple TV, Shield, Chromecast, etc.
+        const tvRegex =
+          /(philips-?tv|\bapple-?tv\b|\btv\b|webos|tizen|bravia|firetv|chromecast|\bshield\b|mibox|roku)/i;
+        if (tvRegex.test(nameAndAp)) {
+          return { type: "tv", iface: bridgeIface || "" };
+        }
+        // LG Electronics on Ethernet (wired LG in home LAN is Smart TV webOS)
+        if (vendor === "LG" && (!isWifi || nameAndAp.includes("tv"))) {
+          return { type: "tv", iface: bridgeIface || "" };
+        }
+        if (vendor === "Philips" && nameAndAp.includes("tv")) {
+          return { type: "tv", iface: bridgeIface || "" };
+        }
+
+        // 3. Smart Home / IoT [IT]
+        // Espressif chips (ESP8266, ESP32, Meshtastic) or standard smart home names
+        const itRegex =
+          /(shelly|tasmota|esphome|tuya|sonoff|roborock|meshtastic|zigbee|\bcam\b|camera|vacuum|plug|bulb|sensor)/i;
+        if (vendor === "Espressif" || itRegex.test(nameAndAp)) {
+          return { type: "it", iface: bridgeIface || "" };
+        }
+
+        // 4. Default for wired devices: all non-TV/AP/IT wired devices are [PC]
+        if (!isWifi) {
+          return { type: "pc", iface: bridgeIface || "" };
+        }
+
+        // 5. Default for wireless devices: [WF]
+        return { type: "wf", iface: "" };
+      }
+
       // ===== CLIENTS (DHCP leases) =====
       async function update_clients() {
         let leases = [];
@@ -4477,11 +4740,33 @@
           }
         }
 
-        leases = Array.from(uniqueV4.values());
+        const allLeases = Array.from(uniqueV4.values());
+        const isDockerIp = (ip) => /^172\.(1[7-9]|2\d|3[01])\./.test(ip || "");
+        const hasDocker = allLeases.some((l) => isDockerIp(l.ip));
+        const dockerWrap = document.getElementById("docker-filter-wrap");
+        if (dockerWrap) {
+          dockerWrap.style.display = hasDocker ? "flex" : "none";
+        }
 
-        // DOCKER FITLER
-        if (!showDockerClients) {
-          leases = leases.filter((l) => !l.ip.startsWith("172.17."));
+        leases = showDockerClients
+          ? allLeases
+          : allLeases.filter((l) => !isDockerIp(l.ip));
+
+        // Global storage for MAC to IP and Name (used by Wi-Fi panel to resolve Unknown IPs/Names)
+        window.ROUTER_MAC_TO_IP = {};
+        window.ROUTER_MAC_TO_NAME = {};
+        for (const l of allLeases) {
+          if (l.mac) {
+            const m = l.mac.toLowerCase();
+            if (l.ip) window.ROUTER_MAC_TO_IP[m] = l.ip;
+            const nm = (
+              l.name ||
+              macNameMap[m] ||
+              ipNameMap[l.ip] ||
+              ""
+            ).replace(/\.lan$/i, "");
+            if (nm) window.ROUTER_MAC_TO_NAME[m] = nm;
+          }
         }
 
         if (!leases.length) {
@@ -4493,33 +4778,72 @@
             "background:var(--surface-3);color:var(--text-muted)";
           return;
         }
+        const [apClients, localWifi, bridgePorts] = await Promise.all([
+          get_ap_wifi_clients(),
+          get_local_wifi_clients(),
+          get_bridge_mac_ports(),
+        ]);
+
         leases.sort(
           (a, b) =>
             (parseInt(a.ip.split(".")[3]) || 0) -
             (parseInt(b.ip.split(".")[3]) || 0),
         );
 
-        // --- Render using strict IP-based CLIENT_MAP ---
+        // --- Render using dynamic classification and bridge ports ---
         let html = "";
         for (const l of leases) {
           const mac = (l.mac || "").toLowerCase().trim();
-          const mapped = CLIENT_MAP[l.ip];
-          const devType = mapped ? mapped.type : "wifi";
+          const wifiClient = apClients[mac] || localWifi[mac] || null;
+          const isWifi = !!wifiClient;
+          const bridgeIface = isWifi ? "" : (bridgePorts[mac] || "");
 
-          let bandClass;
+          if (
+            (!l.name || l.name === "*" || l.name === "") &&
+            wifiClient?.apHostname &&
+            wifiClient.apHostname !== "*" &&
+            wifiClient.apHostname !== "?"
+          ) {
+            l.name = wifiClient.apHostname;
+          }
+
+          const cls = classify_client(
+            l.ip,
+            mac,
+            l.name || "",
+            isWifi,
+            wifiClient,
+            bridgeIface,
+          );
+          const devType = cls.type;
+          const detectedIface = cls.iface || "";
+
+          let bandClass = "pc";
           if (devType === "ap") bandClass = "ap";
           else if (devType === "tv") bandClass = "tv";
-          else if (devType === "wifi") bandClass = "w5";
-          else bandClass = "eth"; // pc
+          else if (devType === "it" || devType === "iot") bandClass = "it";
+          else if (devType === "pc") bandClass = "pc";
+          else if (devType === "wf" || devType === "wifi") {
+            bandClass = wifiClient?.band === "2.4G" ? "w24" : "w5";
+          }
 
-          const symMap = { tv: "[TV]", pc: "[PC]", wifi: "[WF]", ap: "[AP]" };
-          const sym = symMap[devType] || "[??]";
+          const symMap = {
+            pc: "[PC]",
+            tv: "[TV]",
+            ap: "[AP]",
+            wf: "[WF]",
+            wifi: "[WF]",
+            it: "[IT]",
+            iot: "[IT]",
+            eth: "[PC]",
+          };
+          const sym = symMap[devType] || "[PC]";
           const displayName =
             l.name && l.name !== "*" && l.name !== ""
               ? l.name
               : mac.toUpperCase().replace(/:/g, "").slice(0, 12);
 
-          html += `<div class="client-row" onclick="show_client_details('${l.ip}', '${mac}', '${displayName.replace(/'/g, "\\'")}', '${devType}', '${mapped ? mapped.iface : ""}')">
+          html += `<div class="client-row" onclick="show_client_details('${l.ip}', '${mac}', '${displayName.replace(/'/g, "\\'")}', '${devType}', '${detectedIface}')">
       <i class="cicon ${bandClass}" title="${devType}">${sym}</i>
       <span class="cname" title="${mac}">${displayName}</span>
       <span class="cip">${l.ip}</span>
@@ -4613,7 +4937,17 @@
             rxTotal = s.tx_bytes || 0;
             txTotal = s.rx_bytes || 0;
           }
-        } else if (type === "wifi" || type === "ap") {
+        }
+        if (
+          !iface ||
+          !iface.startsWith("eth") ||
+          type === "wf" ||
+          type === "wifi" ||
+          type === "ap" ||
+          type === "tv" ||
+          type === "it" ||
+          type === "iot"
+        ) {
           let localWifiFound = false;
 
           // 4A. Try local Wi-Fi via iwinfo
@@ -4744,6 +5078,10 @@
 
         h += `<div class="ds"><span class="dl">IP</span><span class="dv ok">${ip}</span></div>`;
         h += `<div class="ds"><span class="dl">MAC</span><span class="dv" style="font-family:var(--font-mono);color:var(--text-muted)">${mac.toUpperCase()}</span></div>`;
+        const vendor = get_oui_vendor(mac);
+        if (vendor) {
+          h += `<div class="ds"><span class="dl">vendor</span><span class="dv" style="color:var(--text-muted)">${vendor}</span></div>`;
+        }
 
         // Adding IPv6
         if (window.CLIENT_IPV6 && window.CLIENT_IPV6[mac.toLowerCase()]) {
@@ -4768,7 +5106,7 @@
         <span style="color:var(--cyan)">\u2193${fmt_b(rxSpeed)}</span> <span style="color:var(--orange)">\u2191${fmt_b(txSpeed)}</span>
       </span></div>`;
         } else if (!iface || !iface.startsWith("eth")) {
-          h += `<div class="ds" style="margin-top:4px"><span class="dl" style="color:var(--text-faint);white-space:normal;line-height:1.2">Byte statistics are only available for ports in CLIENT_MAP</span></div>`;
+          h += `<div class="ds" style="margin-top:4px"><span class="dl" style="color:var(--text-faint);white-space:normal;line-height:1.2">Byte statistics are available for wired LAN ports</span></div>`;
         }
 
         $("clients-p").innerHTML = h;
@@ -4939,60 +5277,54 @@
 
             // --- Fetch connected clients via SNMP ---
             try {
-              const snmp = await file_exec("/usr/bin/snmpwalk", [
-                "-Ovq",
-                "-v",
-                "2c",
-                "-c",
-                "public",
-                ap,
-                'NET-SNMP-EXTEND-MIB::nsExtendOutputFull."wifidetails"',
-              ]);
-              const out = (snmp.stdout || "").replace(/["']/g, "").trim();
-              if (out) {
+              const apClients = await get_ap_wifi_clients();
+              const clientList = Object.entries(apClients);
+              if (clientList.length > 0) {
                 html += `<div class="wifi-section"><div class="wifi-sh"><span class="wifi-sname" style="font-size:var(--text-xxs);color:var(--text-faint)">Connected Clients</span></div>`;
-                const lines = out.split("\n");
-                for (const line of lines) {
-                  const p = line.trim().split(/\s+/);
-                  if (p.length >= 4) {
-                    const mac = p[0].toLowerCase();
-                    const ip = p[1];
-                    const band = p[2];
+                for (const [mac, info] of clientList) {
+                  let ip = info.ip;
+                  if (!ip || ip === "Unknown" || ip === "*") {
+                    ip =
+                      window.ROUTER_MAC_TO_IP?.[mac.toLowerCase()] ||
+                      CLIENT_MAP[mac.toLowerCase()]?.ip ||
+                      "";
+                  }
+                  const band = info.band;
+                  const apHostname = info.apHostname;
+                  const sig = info.sig;
+                  let lvl = 0;
+                  if (sig >= -60) lvl = 3;
+                  else if (sig >= -75) lvl = 2;
+                  else if (sig >= -90) lvl = 1;
 
-                    let apHostname = "";
-                    let sigStr = "";
+                  // Format display name with gray IP dot
+                  const ipSuffix =
+                    ip && ip !== "Unknown" ? ip.split(".").pop() : "";
+                  let namePart = ip || "Unknown";
+                  let ipPart = "";
 
-                    if (p.length >= 5) {
-                      apHostname = p.slice(3, p.length - 1).join(" ");
-                      sigStr = p[p.length - 1];
-                    } else {
-                      sigStr = p[3];
-                    }
+                  const mapped =
+                    (ip && CLIENT_MAP[ip]) || CLIENT_MAP[mac.toLowerCase()];
+                  const validApName =
+                    apHostname &&
+                    apHostname !== "*" &&
+                    apHostname !== "?" &&
+                    apHostname.toLowerCase() !== "unknown";
+                  const routerName =
+                    window.ROUTER_MAC_TO_NAME?.[mac.toLowerCase()];
 
-                    const sig = parseInt(sigStr);
-                    let lvl = 0;
-                    if (sig >= -60) lvl = 3;
-                    else if (sig >= -75) lvl = 2;
-                    else if (sig >= -90) lvl = 1;
+                  if (mapped && mapped.name) {
+                    namePart = mapped.name;
+                    ipPart = ipSuffix ? "." + ipSuffix : "";
+                  } else if (validApName) {
+                    namePart = apHostname;
+                    ipPart = ipSuffix ? "." + ipSuffix : "";
+                  } else if (routerName) {
+                    namePart = routerName;
+                    ipPart = ipSuffix ? "." + ipSuffix : "";
+                  }
 
-                    // Format display name with gray IP dot
-                    const ipSuffix = ip.split(".").pop();
-                    let namePart = ip;
-                    let ipPart = "";
-
-                    if (CLIENT_MAP[ip] && CLIENT_MAP[ip].name) {
-                      namePart = CLIENT_MAP[ip].name;
-                      ipPart = "." + ipSuffix;
-                    } else if (
-                      apHostname &&
-                      apHostname !== "*" &&
-                      apHostname !== "?"
-                    ) {
-                      namePart = apHostname;
-                      ipPart = "." + ipSuffix;
-                    }
-
-                    html += `<div class="wrow" style="margin-top:2px;">
+                  html += `<div class="wrow" style="margin-top:2px;">
                 <span class="wlabel" title="${mac}" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:65%">
                   ${ipPart ? `<span style="color:var(--text-faint);margin-right:4px">${ipPart}</span>` : ""}${namePart}
                 </span>
@@ -5001,7 +5333,6 @@
                   <div class="sig-bars lvl-${lvl}"><div class="b1"></div><div class="b2"></div><div class="b3"></div></div>
                 </span>
               </div>`;
-                  }
                 }
                 html += `</div>`;
               }
