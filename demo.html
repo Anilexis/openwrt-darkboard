@@ -2243,30 +2243,41 @@ function render_wifi() {
 // OTHER SERVICES MODAL
 // ============================================================
 const OTHER_SERVICES = [
-  { name: 'LuCI', icon: '⚙️', bg: 'var(--blue-dim)' },
+  { name: 'LuCI', icon: '⚙️', bg: 'var(--blue-dim)', iconRef: 'openwrt' },
   { name: 'Mihomo', icon: '😺', bg: 'var(--cyan-dim)' },
-  { name: 'AdGuard', icon: '🛡️', bg: 'var(--green-dim)' },
+  { name: 'AdGuard', icon: '🛡️', bg: 'var(--green-dim)', iconRef: 'adguard-home' },
   { name: 'WiFi AP', icon: '📶', bg: 'var(--purple-dim)' },
-  { name: 'AriaNG', icon: '⬇️', bg: 'var(--blue-dim)' },
+  { name: 'AriaNG', icon: '⬇️', bg: 'var(--blue-dim)', iconRef: 'aria2' },
   { name: 'cake-stats', icon: '🍰', bg: 'var(--yellow-dim)' },
-  { name: 'Jellyfin', icon: '🎬', bg: 'var(--purple-dim)' },
+  { name: 'Jellyfin', icon: '🎬', bg: 'var(--purple-dim)', iconRef: 'jellyfin' },
   { name: 'TorrServer', icon: '🧲', bg: 'var(--orange-dim)' },
-  { name: 'Transmission', icon: '🔄', bg: 'var(--red-dim)' },
-  { name: 'Netdata', icon: '📈', bg: 'var(--green-dim)' },
-  { name: 'MeshMonitor', icon: '🌐', bg: 'var(--cyan-dim)' }
+  { name: 'Transmission', icon: '🔄', bg: 'var(--red-dim)', iconRef: 'transmission' },
+  { name: 'Netdata', icon: '📈', bg: 'var(--green-dim)', iconRef: 'netdata' },
+  { name: 'MeshMonitor', icon: '🌐', bg: 'var(--cyan-dim)', iconRef: 'png/meshcentral.png' },
+  { name: 'Beszel', icon: '🖥️', bg: 'var(--green-dim)', iconRef: 'beszel' }
 ];
 
 function init_other_services() {
   const grid = $('other-services-grid');
   if (!grid) return;
-  grid.innerHTML = OTHER_SERVICES.map(s => `
+  const selfhst_icon = (ref) => {
+    if (!ref) return null;
+    return ref.includes('/')
+      ? `https://cdn.jsdelivr.net/gh/selfhst/icons/${ref}`
+      : `https://cdn.jsdelivr.net/gh/selfhst/icons/svg/${ref}.svg`;
+  };
+  grid.innerHTML = OTHER_SERVICES.map(s => {
+    const fav = selfhst_icon(s.iconRef);
+    return `
     <a class="srv-btn" href="#" onclick="return false;" title="${s.name} (Demo)">
       <div class="srv-icon" style="background:${s.bg}">
-        <span class="fallback-icon">${s.icon}</span>
+        ${fav ? `<img src="${fav}" alt="${s.name} icon" crossorigin="anonymous" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">` : ''}
+        <span class="fallback-icon"${fav ? ' style="display:none;"' : ''}>${s.icon}</span>
       </div>
       <div class="srv-name">${s.name}</div>
     </a>
-  `).join('');
+  `;
+  }).join('');
 }
 
 function show_other_services() { $('other-services-modal').classList.remove('hidden'); }

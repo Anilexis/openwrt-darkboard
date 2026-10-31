@@ -1936,43 +1936,102 @@
 
       // Static client map: IP or MAC -> { type: 'pc'|'tv'|'ap'|'iot'|'eth'|'wf', iface: 'ethN' }
       // Clients not listed here are automatically classified by DarkBoard
-      const CLIENT_MAP = {
-      };
+      const CLIENT_MAP = {};
 
       // Curated OUI database for common consumer device manufacturers (first 6 hex chars)
       const OUI_VENDORS = {
         // ASUSTek Computer Inc. (Motherboards, PC NICs)
-        "04421a": "ASUSTek", "c87f54": "ASUSTek", "001bfc": "ASUSTek", "00248c": "ASUSTek",
-        "2c4d54": "ASUSTek", "3c7c3f": "ASUSTek", "40167e": "ASUSTek", "50465d": "ASUSTek",
-        "6045cb": "ASUSTek", "ac9e17": "ASUSTek", "b06ebf": "ASUSTek", "bc6ee0": "ASUSTek",
+        "04421a": "ASUSTek",
+        c87f54: "ASUSTek",
+        "001bfc": "ASUSTek",
+        "00248c": "ASUSTek",
+        "2c4d54": "ASUSTek",
+        "3c7c3f": "ASUSTek",
+        "40167e": "ASUSTek",
+        "50465d": "ASUSTek",
+        "6045cb": "ASUSTek",
+        ac9e17: "ASUSTek",
+        b06ebf: "ASUSTek",
+        bc6ee0: "ASUSTek",
         // MSI (Micro-Star INT'L)
-        "002185": "MSI", "002421": "MSI", "d85ed3": "MSI", "001617": "MSI", "4c5262": "MSI",
+        "002185": "MSI",
+        "002421": "MSI",
+        d85ed3: "MSI",
+        "001617": "MSI",
+        "4c5262": "MSI",
         // Gigabyte Technology
-        "001d7d": "Gigabyte", "1c697a": "Gigabyte", "e0d55e": "Gigabyte", "902b34": "Gigabyte", "b42e99": "Gigabyte",
+        "001d7d": "Gigabyte",
+        "1c697a": "Gigabyte",
+        e0d55e: "Gigabyte",
+        "902b34": "Gigabyte",
+        b42e99: "Gigabyte",
         // ASRock
-        "7085c2": "ASRock", "bc5ff4": "ASRock", "d05099": "ASRock",
+        "7085c2": "ASRock",
+        bc5ff4: "ASRock",
+        d05099: "ASRock",
         // Intel Corporate (Desktop/Server NICs)
-        "001517": "Intel", "001e67": "Intel", "00215c": "Intel", "3cfdfe": "Intel", "8086f2": "Intel", "a44cc8": "Intel",
+        "001517": "Intel",
+        "001e67": "Intel",
+        "00215c": "Intel",
+        "3cfdfe": "Intel",
+        "8086f2": "Intel",
+        a44cc8: "Intel",
         // Realtek Semiconductor
-        "00e04c": "Realtek", "52544c": "Realtek",
+        "00e04c": "Realtek",
+        "52544c": "Realtek",
         // LG Electronics (Smart TVs, WebOS)
-        "2cd8ae": "LG", "a823fe": "LG", "cc2d83": "LG", "001c62": "LG", "10f96f": "LG", "203db2": "LG", "58a2b5": "LG", "b86ca8": "LG",
+        "2cd8ae": "LG",
+        a823fe: "LG",
+        cc2d83: "LG",
+        "001c62": "LG",
+        "10f96f": "LG",
+        "203db2": "LG",
+        "58a2b5": "LG",
+        b86ca8: "LG",
         // TP Vision / Philips (Smart TVs)
-        "1c3008": "Philips", "001a80": "Philips", "2082c0": "Philips", "30894a": "Philips",
+        "1c3008": "Philips",
+        "001a80": "Philips",
+        "2082c0": "Philips",
+        "30894a": "Philips",
         // Samsung Electronics
-        "0e2a79": "Samsung", "48bce1": "Samsung", "f47b5e": "Samsung", "5001d9": "Samsung", "0012fb": "Samsung", "34145f": "Samsung", "641cae": "Samsung",
+        "0e2a79": "Samsung",
+        "48bce1": "Samsung",
+        f47b5e: "Samsung",
+        "5001d9": "Samsung",
+        "0012fb": "Samsung",
+        "34145f": "Samsung",
+        "641cae": "Samsung",
         // Qualcomm / Airgo (Mobile & Wearable Wi-Fi)
         "000af5": "Qualcomm",
         // Espressif Systems (ESP8266, ESP32, Meshtastic, Smart Home)
-        "f85b1b": "Espressif", "18fe34": "Espressif", "240ac4": "Espressif", "30aea4": "Espressif",
-        "84f3eb": "Espressif", "485519": "Espressif", "c44f33": "Espressif", "e05a1b": "Espressif",
-        "dc4f22": "Espressif", "246f28": "Espressif", "2462ab": "Espressif", "3cd92b": "Espressif",
+        f85b1b: "Espressif",
+        "18fe34": "Espressif",
+        "240ac4": "Espressif",
+        "30aea4": "Espressif",
+        "84f3eb": "Espressif",
+        485519: "Espressif",
+        c44f33: "Espressif",
+        e05a1b: "Espressif",
+        dc4f22: "Espressif",
+        "246f28": "Espressif",
+        "2462ab": "Espressif",
+        "3cd92b": "Espressif",
         // Raspberry Pi
-        "b827eb": "RaspberryPi", "dca632": "RaspberryPi", "e45f01": "RaspberryPi", "28cdc1": "RaspberryPi",
+        b827eb: "RaspberryPi",
+        dca632: "RaspberryPi",
+        e45f01: "RaspberryPi",
+        "28cdc1": "RaspberryPi",
         // Apple
-        "000393": "Apple", "000502": "Apple", "147dda": "Apple", "3c22fb": "Apple", "f4f15a": "Apple",
+        "000393": "Apple",
+        "000502": "Apple",
+        "147dda": "Apple",
+        "3c22fb": "Apple",
+        f4f15a: "Apple",
         // Sony
-        "00014a": "Sony", "001315": "Sony", "f8461c": "Sony", "fc0fe6": "Sony"
+        "00014a": "Sony",
+        "001315": "Sony",
+        f8461c: "Sony",
+        fc0fe6: "Sony",
       };
 
       function get_oui_vendor(mac) {
@@ -2126,6 +2185,14 @@
         const aghLink = document.getElementById("adguard-ext-link");
         if (aghLink) aghLink.href = agh_url;
 
+        // Helper to resolve selfh.st/icons CDN URLs with format autodetection
+        const selfhst_icon = (ref) => {
+          if (!ref) return null;
+          return ref.includes("/")
+            ? `https://cdn.jsdelivr.net/gh/selfhst/icons/${ref}`
+            : `https://cdn.jsdelivr.net/gh/selfhst/icons/svg/${ref}.svg`;
+        };
+
         // Base array to store dynamically discovered active services
         const apps = [
           {
@@ -2134,7 +2201,7 @@
             icon: "⚙️",
             bg: "var(--blue-dim)",
             showInTopbar: true,
-            fav: luci_url + "/favicon.ico",
+            fav: selfhst_icon("openwrt"),
           },
         ];
 
@@ -2228,7 +2295,7 @@
                   icon: "⬇️",
                   bg: "var(--blue-dim)",
                   showInTopbar: false,
-                  fav: `http://${host}/ariang/favicon.png`,
+                  fav: selfhst_icon("aria2"),
                 });
               }
             })
@@ -2244,6 +2311,7 @@
           bg,
           showInTopbar = false,
           favPath = "/favicon.ico",
+          iconRef = "",
         ) => {
           let isAlive = false;
           const targetUrl = `http://${host}:${port}${urlSuffix}`;
@@ -2284,14 +2352,25 @@
               icon,
               bg,
               showInTopbar,
-              fav: `http://${host}:${port}${favPath}`,
+              fav: iconRef
+                ? selfhst_icon(iconRef)
+                : `http://${host}:${port}${favPath}`,
             });
           }
         };
 
         // Add AdGuard to universal check
         checks.push(
-          checkService(agh_port, "AdGuard", "", "🛡️", "var(--green-dim)", true),
+          checkService(
+            agh_port,
+            "AdGuard",
+            "",
+            "🛡️",
+            "var(--green-dim)",
+            true,
+            "/favicon.ico",
+            "adguard-home",
+          ),
         );
 
         // ── Auto-discovery registry ───────────────────────────────────────────────
@@ -2307,12 +2386,14 @@
           {
             ports: [3001, 8282],
             name: "MeshMonitor",
+            iconRef: "png/meshtastic.png",
             icon: "🌐",
             bg: "var(--cyan-dim)",
           },
           {
             ports: [8096],
             name: "Jellyfin",
+            iconRef: "jellyfin",
             icon: "🎬",
             bg: "var(--purple-dim)",
           },
@@ -2325,18 +2406,21 @@
           {
             ports: [8090],
             name: "TorrServer",
+            checkPath: "/echo",
             icon: "🧲",
             bg: "var(--orange-dim)",
           },
           {
             ports: [9091],
             name: "Transmission",
+            iconRef: "transmission",
             icon: "🔄",
             bg: "var(--red-dim)",
           },
           {
             ports: [19999],
             name: "Netdata",
+            iconRef: "netdata",
             icon: "📈",
             bg: "var(--green-dim)",
           },
@@ -2344,6 +2428,7 @@
           {
             ports: [9000, 9443],
             name: "Portainer",
+            iconRef: "portainer",
             icon: "🐳",
             bg: "var(--blue-dim)",
             checkPath: "/api/status",
@@ -2353,6 +2438,7 @@
           {
             ports: [8080],
             name: "qBittorrent",
+            iconRef: "qbittorrent",
             icon: "🌊",
             bg: "var(--blue-dim)",
             checkPath: "/api/v2/app/version",
@@ -2360,6 +2446,7 @@
           {
             ports: [9092],
             name: "Transmission 2",
+            iconRef: "transmission",
             icon: "🔄",
             bg: "var(--red-dim)",
           },
@@ -2367,6 +2454,7 @@
           {
             ports: [2283],
             name: "Immich",
+            iconRef: "immich",
             icon: "📷",
             bg: "var(--yellow-dim)",
             checkPath: "/api/server-info/ping",
@@ -2374,6 +2462,7 @@
           {
             ports: [4533],
             name: "Navidrome",
+            iconRef: "navidrome",
             icon: "🎶",
             bg: "var(--purple-dim)",
             checkPath: "/rest/ping.view?v=1.8.0&c=check&f=json",
@@ -2382,6 +2471,7 @@
           {
             ports: [3000],
             name: "Grafana",
+            iconRef: "grafana",
             icon: "📊",
             bg: "var(--orange-dim)",
             checkPath: "/api/health",
@@ -2389,15 +2479,32 @@
           {
             ports: [8181],
             name: "Tautulli",
+            iconRef: "tautulli",
             icon: "📈",
             bg: "var(--orange-dim)",
             checkPath: "/api/v2?apikey=x&cmd=status",
           },
-          { ports: [7575], name: "Homarr", icon: "🏠", bg: "var(--cyan-dim)" },
+          {
+            ports: [8095, 8090],
+            name: "Beszel",
+            iconRef: "beszel",
+            icon: "🖥️",
+            bg: "var(--green-dim)",
+            checkPath: "/api/health",
+            favPath: "/static/icon.svg",
+          },
+          {
+            ports: [7575],
+            name: "Homarr",
+            icon: "🏠",
+            iconRef: "homarr",
+            bg: "var(--cyan-dim)",
+          },
           // ── *arr suite ───────────────────────────────────────────────────────────
           {
             ports: [7878],
             name: "Radarr",
+            iconRef: "radarr",
             icon: "🎞️",
             bg: "var(--yellow-dim)",
             checkPath: "/api/v3/system/status",
@@ -2405,6 +2512,7 @@
           {
             ports: [8989],
             name: "Sonarr",
+            iconRef: "sonarr",
             icon: "📺",
             bg: "var(--blue-dim)",
             checkPath: "/api/v3/system/status",
@@ -2412,6 +2520,7 @@
           {
             ports: [8686],
             name: "Lidarr",
+            iconRef: "lidarr",
             icon: "🎵",
             bg: "var(--purple-dim)",
             checkPath: "/api/v1/system/status",
@@ -2419,6 +2528,7 @@
           {
             ports: [8787],
             name: "Readarr",
+            iconRef: "readarr",
             icon: "📚",
             bg: "var(--cyan-dim)",
             checkPath: "/api/v1/system/status",
@@ -2426,6 +2536,7 @@
           {
             ports: [9696],
             name: "Prowlarr",
+            iconRef: "prowlarr",
             icon: "🔍",
             bg: "var(--red-dim)",
             checkPath: "/api/v1/system/status",
@@ -2433,6 +2544,7 @@
           {
             ports: [6767],
             name: "Bazarr",
+            iconRef: "bazarr",
             icon: "💬",
             bg: "var(--green-dim)",
             checkPath: "/api/episodes",
@@ -2440,6 +2552,7 @@
           {
             ports: [5055],
             name: "Overseerr",
+            iconRef: "overseerr",
             icon: "🎯",
             bg: "var(--blue-dim)",
             checkPath: "/api/v1/status",
@@ -2448,6 +2561,7 @@
           {
             ports: [8123],
             name: "Home Assist.",
+            iconRef: "home-assistant",
             icon: "🏠",
             bg: "var(--orange-dim)",
             checkPath: "/api/",
@@ -2508,7 +2622,11 @@
                     icon: svc.icon,
                     bg: svc.bg,
                     showInTopbar: svc.showInTopbar || false,
-                    fav: `http://${host}:${port}${svc.favPath || "/favicon.ico"}`,
+                    fav: svc.iconRef
+                      ? selfhst_icon(svc.iconRef)
+                      : svc.favPath
+                        ? `http://${host}:${port}${svc.favPath}`
+                        : `http://${host}:${port}/favicon.ico`,
                   });
                   break; // first responsive port wins — don't double-register
                 }
@@ -2533,8 +2651,8 @@
         apps.forEach((app) => {
           modalHtml += `<a class="srv-btn" href="${app.url}" target="_blank" rel="noopener">
       <div class="srv-icon" style="background:${app.bg}">
-        <img src="${app.fav}" alt="${app.name} icon" crossorigin="anonymous" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
-        <span class="fallback-icon" style="display:none;">${app.icon}</span>
+        ${app.fav ? `<img src="${app.fav}" alt="${app.name} icon" crossorigin="anonymous" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">` : ""}
+        <span class="fallback-icon"${app.fav ? ' style="display:none;"' : ""}>${app.icon}</span>
       </div>
       <div class="srv-name">${app.name}</div>
     </a>`;
@@ -3668,11 +3786,8 @@
                   ? "↓" + fmt_sz_compact(downVol)
                   : "";
               if (vtxEl)
-                vtxEl.textContent = hasUpVol
-                  ? "↑" + fmt_sz_compact(upVol)
-                  : "";
-              if (sepEl)
-                sepEl.textContent = hasDownVol && hasUpVol ? "/" : "";
+                vtxEl.textContent = hasUpVol ? "↑" + fmt_sz_compact(upVol) : "";
+              if (sepEl) sepEl.textContent = hasDownVol && hasUpVol ? "/" : "";
             } else {
               volEl.style.display = "none";
             }
@@ -4636,7 +4751,9 @@
         }
         const portMap = {}; // port_no (integer) -> iface name ("eth2")
         try {
-          const ls = await file_exec("/bin/ls", ["/sys/class/net/br-lan/brif/"]);
+          const ls = await file_exec("/bin/ls", [
+            "/sys/class/net/br-lan/brif/",
+          ]);
           if (ls?.stdout) {
             const ifaces = ls.stdout
               .split("\n")
@@ -4700,7 +4817,9 @@
           }
           return c;
         } catch (e) {
-          return { "00:0a:f5:6e:e1:b3": { band: "2.4G", apHostname: "TicWatch" } };
+          return {
+            "00:0a:f5:6e:e1:b3": { band: "2.4G", apHostname: "TicWatch" },
+          };
         }
       }
       function save_wifi_cache(cache) {
@@ -4763,7 +4882,7 @@
                   cache[mac] = {
                     band,
                     apHostname,
-                    ip: ip !== "Unknown" ? ip : (cache[mac]?.ip || ""),
+                    ip: ip !== "Unknown" ? ip : cache[mac]?.ip || "",
                     lastSeen: now,
                   };
                 }
@@ -4788,7 +4907,10 @@
           await Promise.all(
             names.map(async (wif) => {
               try {
-                const r = await file_exec("/usr/bin/iwinfo", [wif, "assoclist"]);
+                const r = await file_exec("/usr/bin/iwinfo", [
+                  wif,
+                  "assoclist",
+                ]);
                 const out = (r?.stdout || "").replace(/["']/g, "");
                 if (out) {
                   for (const line of out.split("\n")) {
@@ -4813,7 +4935,14 @@
         return map;
       }
 
-      function classify_client(ip, mac, hostname, isWifi, wifiClient, bridgeIface) {
+      function classify_client(
+        ip,
+        mac,
+        hostname,
+        isWifi,
+        wifiClient,
+        bridgeIface,
+      ) {
         const m = (mac || "").toLowerCase();
         // 0. Explicit manual override in CLIENT_MAP (Rule A preserved)
         if (CLIENT_MAP[ip] && CLIENT_MAP[ip].type) {
@@ -4838,7 +4967,8 @@
         }
 
         const vendor = get_oui_vendor(m);
-        const nameAndAp = `${hostname} ${wifiClient?.apHostname || ""}`.toLowerCase();
+        const nameAndAp =
+          `${hostname} ${wifiClient?.apHostname || ""}`.toLowerCase();
 
         // 2. Smart TV / Media Box [TV]
         // Standard TV names, webOS, Tizen, Bravia, Apple TV, Shield, Chromecast, etc.
@@ -5121,7 +5251,7 @@
             l.ip !== C.wifi_ap
           );
           const isWifi = !!liveWifi || !!cachedWifi || isBehindAp;
-          const bridgeIface = isWifi ? "" : (bridgePorts[mac] || "");
+          const bridgeIface = isWifi ? "" : bridgePorts[mac] || "";
 
           if (!l.name || l.name === "*" || l.name === "") {
             const candidateName =
@@ -5274,7 +5404,7 @@
             for (const line of lines) {
               if (!line || !line.includes(ip)) continue;
               const m = line.match(
-                /src=(\S+)\s+dst=(\S+)(?:\s+sport=(\d+)\s+dport=(\d+))?.*?bytes=(\d+).*?src=(\S+)\s+dst=(\S+)(?:\s+sport=(\d+)\s+dport=(\d+))?.*?bytes=(\d+)/
+                /src=(\S+)\s+dst=(\S+)(?:\s+sport=(\d+)\s+dport=(\d+))?.*?bytes=(\d+).*?src=(\S+)\s+dst=(\S+)(?:\s+sport=(\d+)\s+dport=(\d+))?.*?bytes=(\d+)/,
               );
               if (m) {
                 const [, s1, d1, sp1, dp1, b1, s2, d2, sp2, dp2, b2] = m;
@@ -5350,11 +5480,16 @@
             const assocResults = await Promise.all(
               names.map((wif) =>
                 file_exec("/usr/bin/iwinfo", [wif, "assoclist"])
-                  .then((r) => ({ wif, out: (r.stdout || "").replace(/["']/g, "") }))
-                  .catch(() => ({ wif, out: "" }))
-              )
+                  .then((r) => ({
+                    wif,
+                    out: (r.stdout || "").replace(/["']/g, ""),
+                  }))
+                  .catch(() => ({ wif, out: "" })),
+              ),
             );
-            const found = assocResults.find(({ out }) => out.includes(macUpper));
+            const found = assocResults.find(({ out }) =>
+              out.includes(macUpper),
+            );
             if (found) {
               const { wif, out } = found;
               localWifiFound = true;
@@ -5560,7 +5695,13 @@
         }
 
         const getSfx = (rate) =>
-          rate >= 25e6 ? "hi" : rate >= 5e6 ? "mid" : rate >= 1e6 ? "lo" : "dim";
+          rate >= 25e6
+            ? "hi"
+            : rate >= 5e6
+              ? "mid"
+              : rate >= 1e6
+                ? "lo"
+                : "dim";
 
         let showClientRx = false;
         let showClientTx = false;
