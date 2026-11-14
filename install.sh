@@ -142,27 +142,27 @@ E_WIFI_AP=$(escape_sed "$WIFI_AP")
 E_WIFI_AP_PORT=$(escape_sed "$WIFI_AP_PORT")
 
 # Patch DEFAULTS block
-sed -i "s|router_ip:\s*'192.168.1.1'|router_ip: '${E_ROUTER_IP}'|g" /tmp/dashboard-install.html
+sed -i "s|router_ip:[[:space:]]*['\"]192\.168\.1\.1['\"]|router_ip:    '${E_ROUTER_IP}'|g" /tmp/dashboard-install.html
 
-# Patch derived URLs
-sed -i "s|'http://192.168.1.1'|'http://${E_ROUTER_IP}'|g" /tmp/dashboard-install.html
-sed -i "s|'http://192.168.1.1/ubus'|'http://${E_ROUTER_IP}/ubus'|g" /tmp/dashboard-install.html
-sed -i "s|mihomo_api:\s*'http://192.168.1.1:9090'|mihomo_api: 'http://${E_ROUTER_IP}:${E_MIHOMO_PORT}'|g" /tmp/dashboard-install.html
-sed -i "s|adguard_host:\s*'192.168.1.1'|adguard_host: '${E_ROUTER_IP}'|g" /tmp/dashboard-install.html
+# Patch derived URLs (legacy/fallback if present)
+sed -i "s|['\"]http://192\.168\.1\.1['\"]|'http://${E_ROUTER_IP}'|g" /tmp/dashboard-install.html
+sed -i "s|['\"]http://192\.168\.1\.1/ubus['\"]|'http://${E_ROUTER_IP}/ubus'|g" /tmp/dashboard-install.html
+sed -i "s|mihomo_api:[[:space:]]*['\"]http://192\.168\.1\.1:9090['\"]|mihomo_api: 'http://${E_ROUTER_IP}:${E_MIHOMO_PORT}'|g" /tmp/dashboard-install.html
+sed -i "s|adguard_host:[[:space:]]*['\"]192\.168\.1\.1['\"]|adguard_host: '${E_ROUTER_IP}'|g" /tmp/dashboard-install.html
 
 # Mihomo port
-sed -i "s|mihomo_port:\s*9090|mihomo_port: ${E_MIHOMO_PORT}|g" /tmp/dashboard-install.html
+sed -i "s|mihomo_port:[[:space:]]*9090|mihomo_port:  ${E_MIHOMO_PORT}|g" /tmp/dashboard-install.html
 
 # AdGuard port (only if enabled)
 if [ "$ADG_ENABLE" = "y" ] || [ "$ADG_ENABLE" = "Y" ]; then
-  sed -i "s|adguard_port:\s*3003,|adguard_port: ${E_ADG_PORT},|g" /tmp/dashboard-install.html
+  sed -i "s|adguard_port:[[:space:]]*3003,|adguard_port: ${E_ADG_PORT},|g" /tmp/dashboard-install.html
 fi
 
 # WiFi AP
 if [ -n "$WIFI_AP" ]; then
-  sed -i "s|wifi_ap_ip:\s*'192.168.1.4'|wifi_ap_ip: '${E_WIFI_AP}'|g" /tmp/dashboard-install.html
-  sed -i "s|wifi_ap_port:\s*80,|wifi_ap_port: ${E_WIFI_AP_PORT},|g" /tmp/dashboard-install.html
-  sed -i "s|wifi_ap_https:\s*false|wifi_ap_https: ${WIFI_AP_HTTPS}|g" /tmp/dashboard-install.html
+  sed -i "s|wifi_ap_ip:[[:space:]]*['\"]192\.168\.1\.4['\"]|wifi_ap_ip:   '${E_WIFI_AP}'|g" /tmp/dashboard-install.html
+  sed -i "s|wifi_ap_port:[[:space:]]*80,|wifi_ap_port: ${E_WIFI_AP_PORT},|g" /tmp/dashboard-install.html
+  sed -i "s|wifi_ap_https:[[:space:]]*false|wifi_ap_https: ${WIFI_AP_HTTPS}|g" /tmp/dashboard-install.html
 fi
 
 # Passwords (luci_pass, mihomo_secret, adguard_pass) are NOT patched here.
@@ -193,7 +193,11 @@ if [ -n "$CLIENT_ENTRIES" ]; then
     E_REPLACEMENT=$(printf '%s' "$REPLACEMENT" | sed ':a;N;$!ba;s/\n/\\n/g;s/[&/]/\\&/g')
 
     # Replace the entire CLIENT_MAP block
-    sed -i "/^const CLIENT_MAP = {/,/^};/c\\${E_REPLACEMENT}" /tmp/dashboard-install.html
+    if grep -qE '^[[:space:]]*const CLIENT_MAP = \{[[:space:]]*\};' /tmp/dashboard-install.html; then
+      sed -i "s|^[[:space:]]*const CLIENT_MAP = {[[:space:]]*};|${E_REPLACEMENT}|g" /tmp/dashboard-install.html
+    else
+      sed -i "/^[[:space:]]*const CLIENT_MAP = {/,/^[[:space:]]*};/c\\${E_REPLACEMENT}" /tmp/dashboard-install.html
+    fi
     rm -f /tmp/_darkboard_clients.js
     ok "CLIENT_MAP patched with custom entries"
   fi

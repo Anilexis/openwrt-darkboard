@@ -1643,7 +1643,7 @@ const DEMO_STATE = {
     { ip: '172.17.0.2', name: 'AdGuard-Container', mac: '02:42:ac:11:00:02', type: 'pc', iface: 'docker0', conns: 15, rx: 1500, tx: 1200, totRx: 45 * 1024**2, totTx: 30 * 1024**2, isDocker: true }
   ],
   mihomo: [
-    { name: 'AUTO-FOREIGN-POOL', type: 'URLTest', active: 'NordVPN_Finland', ok: 53, fail: 1, total: 54 },
+    { name: 'AUTO-FOREIGN-POOL', type: 'Smart', active: 'NordVPN_Finland', ok: 53, fail: 1, total: 54 },
     { name: 'CASCADE-AI', type: 'URLTest', active: 'Cloudflare-WARP', ok: 1, fail: 0, total: 1 },
     { name: 'MANUAL-SELECT', type: 'Selector', active: 'NordVPN_Sweden', ok: 59, fail: 2, total: 61 },
     { name: 'PAYPAL-POOL', type: 'Fallback', active: 'NordVPN_Germany', ok: 1, fail: 1, total: 2 }
@@ -2158,8 +2158,9 @@ function render_mihomo() {
   if (!el) return;
   let html = '';
   for (const g of DEMO_STATE.mihomo) {
-    const tc = g.type === 'URLTest' ? 'var(--cyan)' : g.type === 'Fallback' ? 'var(--yellow)' : 'var(--purple)';
-    const tl = g.type === 'URLTest' ? 'url-test' : g.type === 'Fallback' ? 'fallback' : 'select';
+    const tLower = (g.type || '').toLowerCase();
+    const tc = tLower === 'urltest' ? 'var(--cyan)' : tLower === 'fallback' ? 'var(--yellow)' : tLower === 'smart' ? 'var(--blue)' : 'var(--purple)';
+    const tl = tLower === 'urltest' ? 'url-test' : tLower === 'fallback' ? 'fallback' : tLower === 'smart' ? 'smart' : 'select';
     html += `<div class="vgrp">
       <div class="vgh"><span class="vgname">${g.name}</span><span class="vgtype" style="color:${tc}">${tl}</span></div>
       <div class="vgactive" title="${g.active}">&#9654; ${g.active}</div>

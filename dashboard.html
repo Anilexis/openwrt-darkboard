@@ -1921,22 +1921,23 @@
       // ===== BUILT-IN DEFAULTS =====
       // These defaults work out-of-the-box for the author's setup.
       // Other users configure via the setup modal on first launch.
-      const DEFAULTS = {
-        router_ip: "192.168.1.1",
-        luci_port: 80,
-        mihomo_port: 9090,
-        adguard_port: 3003,
-        adguard_user: "admin",
-        wifi_ap_ip: "192.168.1.4",
-        wifi_ap_port: 80,
-        wifi_ap_https: false,
-        ariangport: 6800,
-        cake_stats_port: 11112,
-      };
+const DEFAULTS = {
+  router_ip:    '192.168.1.1',
+  luci_port:    80,
+  mihomo_port:  9090,
+  adguard_port: 3003,
+  adguard_user: 'admin',
+  wifi_ap_ip:   '192.168.1.4',
+  wifi_ap_port: 80,
+  wifi_ap_https:false,
+  ariangport: 6800,
+  cake_stats_port: 11112,
+};
 
       // Static client map: IP or MAC -> { type: 'pc'|'tv'|'ap'|'iot'|'eth'|'wf', iface: 'ethN' }
       // Clients not listed here are automatically classified by DarkBoard
-      const CLIENT_MAP = {};
+const CLIENT_MAP = {
+};
 
       // Curated OUI database for common consumer device manufacturers (first 6 hex chars)
       const OUI_VENDORS = {
@@ -4031,8 +4032,9 @@
           const dynamic = Object.entries(groups)
             .filter(
               ([n, g]) =>
-                ["Selector", "URLTest", "Fallback"].includes(g.type) &&
-                !SKIP_LAT.has(n),
+                ["selector", "urltest", "fallback", "smart"].includes(
+                  (g.type || "").toLowerCase(),
+                ) && !SKIP_LAT.has(n),
             )
             .map(([n]) => ({ name: n, label: n }))
             .sort((a, b) => a.name.localeCompare(b.name));
@@ -4081,6 +4083,7 @@
         }
       }
       async function update_ping() {
+        if (LAT_GROUPS.length <= 1) await init_lat_groups();
         latD = {};
         const tasks = [];
         for (const g of getActiveLAT_GROUPS())
@@ -4567,8 +4570,9 @@
           const GNAMES = Object.entries(groups)
             .filter(
               ([n, g]) =>
-                ["Selector", "URLTest", "Fallback"].includes(g.type) &&
-                !SKIP_MI.has(n),
+                ["selector", "urltest", "fallback", "smart"].includes(
+                  (g.type || "").toLowerCase(),
+                ) && !SKIP_MI.has(n),
             )
             .map(([n]) => n)
             .sort();
@@ -4613,20 +4617,25 @@
               if (isWorking) alive++;
             }
 
+            const tLower = (type || "").toLowerCase();
             const tc =
-              type === "URLTest"
+              tLower === "urltest"
                 ? "var(--cyan)"
-                : type === "Fallback"
+                : tLower === "fallback"
                   ? "var(--yellow)"
-                  : "var(--purple)";
+                  : tLower === "smart"
+                    ? "var(--blue)"
+                    : "var(--purple)";
             const tl =
-              type === "URLTest"
+              tLower === "urltest"
                 ? "url-test"
-                : type === "Fallback"
+                : tLower === "fallback"
                   ? "fallback"
-                  : type === "Selector"
+                  : tLower === "selector"
                     ? "select"
-                    : type.toLowerCase();
+                    : tLower === "smart"
+                      ? "smart"
+                      : type.toLowerCase();
             html += `<div class="vgrp"><div class="vgh"><span class="vgname">${gn}</span><span class="vgtype" style="color:${tc}">${tl}</span></div>
         <div class="vgactive" title="${now_n}">\u25B6 ${now_n}</div>
         ${all > 0 ? `<div class="vgstats"><span class="vst-ok">\u2713 ${alive}</span><span class="vst-err">\u2717 ${all - alive}</span><span>/ ${all}</span></div>` : ""}
