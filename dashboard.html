@@ -579,7 +579,8 @@
       }
 
       /* LATENCY FILTER MODAL */
-      .lat-check-row {
+      .lat-check-row,
+      .group-check-row {
         display: flex;
         align-items: center;
         gap: 8px;
@@ -588,14 +589,16 @@
         cursor: pointer;
         padding: 3px 0;
       }
-      .lat-check-row input[type="checkbox"] {
+      .lat-check-row input[type="checkbox"],
+      .group-check-row input[type="checkbox"] {
         accent-color: var(--cyan);
         width: 14px;
         height: 14px;
         cursor: pointer;
         flex-shrink: 0;
       }
-      .lat-check-row:hover {
+      .lat-check-row:hover,
+      .group-check-row:hover {
         color: var(--cyan);
       }
 
@@ -1595,15 +1598,24 @@
               >MIHOMO PROXY
               <span class="badge b-cyan" id="mi-mode">--</span></span
             >
-            <a
-              class="ext"
-              id="mihomo-ext-link"
-              href="#"
-              target="_blank"
-              rel="noopener"
-              title="Open Metacubexd"
-              >&#8599;</a
-            >
+            <div class="ptitle-r">
+              <button
+                class="svc-action"
+                title="Configure proxy groups"
+                onclick="showMihomoSettings()"
+              >
+                &#9965;
+              </button>
+              <a
+                class="ext"
+                id="mihomo-ext-link"
+                href="#"
+                target="_blank"
+                rel="noopener"
+                title="Open Metacubexd"
+                >&#8599;</a
+              >
+            </div>
           </div>
           <div class="si" id="vpn-p"></div>
         </div>
@@ -1865,6 +1877,43 @@
             Cancel
           </button>
           <button class="modal-btn primary" onclick="saveLatencySettings()">
+            Save
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MIHOMO SETTINGS MODAL -->
+    <div class="modal-overlay hidden" id="mihomo-modal">
+      <div class="modal-box" style="min-width: 300px; max-width: 420px">
+        <div class="modal-title">&#9965; Mihomo Group Filter</div>
+        <div class="modal-sub">
+          Select which proxy groups to display. Settings are saved in localStorage.
+        </div>
+        <div
+          id="mihomo-group-list"
+          style="
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-bottom: 16px;
+          "
+        ></div>
+        <div class="modal-actions">
+          <button class="modal-btn secondary" onclick="mihomoModalSelectAll()">
+            All
+          </button>
+          <button
+            class="modal-btn secondary"
+            onclick="mihomoModalSelectNone()"
+          >
+            None
+          </button>
+          <span style="flex: 1"></span>
+          <button class="modal-btn secondary" onclick="closeMihomoModal()">
+            Cancel
+          </button>
+          <button class="modal-btn primary" onclick="saveMihomoSettings()">
             Save
           </button>
         </div>
@@ -4577,8 +4626,11 @@ const CLIENT_MAP = {
             .map(([n]) => n)
             .sort();
 
+          MI_GROUPS = GNAMES;
+          const activeGroups = getActiveMihomoGroups(GNAMES);
+
           let html = "";
-          for (const gn of GNAMES) {
+          for (const gn of activeGroups) {
             const g = groups[gn];
             if (!g) continue;
             const all = (g.all || []).length,
@@ -6367,6 +6419,82 @@ const CLIENT_MAP = {
         if (overlay)
           overlay.addEventListener("click", (e) => {
             if (e.target === overlay) closeLatencyModal();
+          });
+      });
+
+      // ── MIHOMO SETTINGS MODAL ──────────────────────────────────────────────────
+      const MIHOMO_FILTER_KEY = "darkboard-mihomo-filter";
+      let MI_GROUPS = [];
+
+      function getMihomoFilter() {
+        try {
+          const s = localStorage.getItem(MIHOMO_FILTER_KEY);
+          return s ? JSON.parse(s) : null;
+        } catch (e) {
+          return null;
+        }
+      }
+
+      function getActiveMihomoGroups(allGroups) {
+        const filter = getMihomoFilter();
+        if (!filter) return allGroups;
+        return allGroups.filter((name) => filter[name] !== false);
+      }
+
+      function showMihomoSettings() {
+        const filter = getMihomoFilter();
+        const list = document.getElementById("mihomo-group-list");
+        if (!list) return;
+        if (!MI_GROUPS || MI_GROUPS.length === 0) {
+          list.innerHTML =
+            '<div style="color:var(--text-muted);font-size:var(--text-sm);padding:4px 0;">No groups discovered yet</div>';
+        } else {
+          list.innerHTML = MI_GROUPS.map((name, idx) => {
+            const checked = filter ? filter[name] !== false : true;
+            return `<label class="lat-check-row">
+        <input type="checkbox" id="mick-${idx}" ${checked ? "checked" : ""}>
+        <span>${name}</span>
+      </label>`;
+          }).join("");
+        }
+        document.getElementById("mihomo-modal").classList.remove("hidden");
+      }
+
+      function closeMihomoModal() {
+        document.getElementById("mihomo-modal").classList.add("hidden");
+      }
+
+      function mihomoModalSelectAll() {
+        document
+          .querySelectorAll("#mihomo-group-list input[type=checkbox]")
+          .forEach((c) => (c.checked = true));
+      }
+
+      function mihomoModalSelectNone() {
+        document
+          .querySelectorAll("#mihomo-group-list input[type=checkbox]")
+          .forEach((c) => (c.checked = false));
+      }
+
+      function saveMihomoSettings() {
+        const filter = {};
+        MI_GROUPS.forEach((name, idx) => {
+          const el = document.getElementById("mick-" + idx);
+          filter[name] = el ? el.checked : true;
+        });
+        try {
+          localStorage.setItem(MIHOMO_FILTER_KEY, JSON.stringify(filter));
+        } catch (e) {}
+        closeMihomoModal();
+        update_mihomo();
+      }
+
+      // Close modal on overlay click
+      document.addEventListener("DOMContentLoaded", () => {
+        const overlay = document.getElementById("mihomo-modal");
+        if (overlay)
+          overlay.addEventListener("click", (e) => {
+            if (e.target === overlay) closeMihomoModal();
           });
       });
 
